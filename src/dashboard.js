@@ -64,17 +64,23 @@ const clockTime = (iso) =>
     month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   });
 
+/**
+ * The count sits beside the track, not on top of it: a label inside the bar has
+ * to be light over the fill and dark over the empty track, and no single colour
+ * clears both. Outside it, ink-on-white holds at every fill level.
+ */
 function fillBar(signed, max) {
   const n = Number(signed) || 0;
   const cap = Number(max);
   if (!Number.isFinite(cap) || cap <= 0) {
-    return `<div class="bar bar-na"><span class="bar-label">${n} registered</span></div>`;
+    return `<div class="fill bar-na"><span class="bar-label">${n} registered</span></div>`;
   }
   const pct = Math.max(0, Math.min(100, (n / cap) * 100));
   const full = n >= cap;
-  return `<div class="bar${full ? ' is-full' : ''}" role="img"
-      aria-label="${n} of ${cap} spots taken">
-      <span class="bar-fill" style="width:${pct.toFixed(1)}%"></span>
+  return `<div class="fill">
+      <span class="bar${full ? ' is-full' : ''}" role="img" aria-label="${n} of ${cap} spots taken">
+        <span class="bar-fill" style="width:${pct.toFixed(1)}%"></span>
+      </span>
       <span class="bar-label">${n}<span class="denom">/${cap}</span>${full ? ' <b>FULL</b>' : ''}</span>
     </div>`;
 }
@@ -128,8 +134,8 @@ function buildDashboard({ config, upcoming, past, history, generatedAt, stats })
           <span class="s-when">${esc(ev.startLabel)}</span>
           <span class="s-name">${esc(ev.name)}</span>
           <span class="s-fill">${fillBar(ev.registrants.length, ev.max)}</span>
-          ${ev.waitlist.length ? `<span class="s-wait">${ev.waitlist.length} waiting</span>` : ''}
-          ${ev.scrapedAt ? `<span class="s-asof">as of ${esc(relativeTime(ev.scrapedAt, Date.parse(generatedAt)))}</span>` : ''}
+          <span class="s-wait">${ev.waitlist.length ? `${ev.waitlist.length} waiting` : '\u2014'}</span>
+          <span class="s-asof">${ev.scrapedAt ? `as of ${esc(relativeTime(ev.scrapedAt, Date.parse(generatedAt)))}` : '\u2014'}</span>
         </summary>
         <div class="s-body">
           <div class="s-col">
@@ -163,13 +169,10 @@ function buildDashboard({ config, upcoming, past, history, generatedAt, stats })
 <title>${esc(config.org.name)} &mdash; Open Play Watcher</title>
 <style>
   :root{
+    color-scheme:light;
     --bg:#ffffff; --surface:#f8fafc; --line:#e2e8f0; --ink:#0f172a; --muted:#64748b;
     --bar:#1d4ed8; --bar-track:#e2e8f0;
     --up:#166534; --down:#be123c; --wait:#64748b;
-  }
-  @media (prefers-color-scheme:dark){
-    :root{ --bg:#0b1120; --surface:#131c2e; --line:#24304a; --ink:#e6edf7; --muted:#93a3b8;
-           --bar:#60a5fa; --bar-track:#24304a; --up:#4ade80; --down:#fb7185; --wait:#93a3b8; }
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
@@ -186,21 +189,24 @@ function buildDashboard({ config, upcoming, past, history, generatedAt, stats })
   .stat span{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
   h2{font-size:15px;margin:34px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);
      text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
-  .bar{position:relative;height:20px;min-width:96px;background:var(--bar-track);border-radius:4px;overflow:hidden;display:inline-block;vertical-align:middle}
+  .fill{display:flex;align-items:center;gap:8px;width:100%;max-width:280px;min-width:0}
+  .bar{position:relative;flex:1 1 auto;height:20px;min-width:48px;background:var(--bar-track);
+       border-radius:4px;overflow:hidden;display:block}
   .bar-fill{position:absolute;inset:0 auto 0 0;background:var(--bar);display:block}
-  .bar-label{position:relative;display:block;padding:0 7px;font-size:12px;font-weight:650;line-height:20px;color:var(--ink);mix-blend-mode:normal}
+  .bar-label{flex:0 0 auto;font-size:12px;font-weight:650;line-height:20px;color:var(--ink);white-space:nowrap}
+  .bar-label b{color:var(--down);font-weight:750;letter-spacing:.02em}
   .bar.is-full .bar-fill{background:var(--down)}
-  .bar.is-full .bar-label{color:#fff}
-  .bar-na{background:transparent;border:1px dashed var(--line)}
+  .bar-na .bar-label{color:var(--muted)}
   .denom{color:var(--muted);font-weight:500}
-  .bar.is-full .denom{color:#fecdd3}
   details.session{border:1px solid var(--line);border-radius:10px;margin:0 0 8px;background:var(--bg)}
   details.session>summary{list-style:none;cursor:pointer;padding:11px 14px;display:grid;
-     grid-template-columns:190px minmax(0,1fr) 150px auto auto;gap:12px;align-items:center}
+     grid-template-columns:170px minmax(0,1fr) 158px 88px 104px;gap:12px;align-items:center}
   details.session>summary::-webkit-details-marker{display:none}
-  .s-when{font-weight:650;font-size:13.5px}
+  .s-when{font-weight:650;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .s-name{color:var(--muted);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .s-wait,.s-asof{color:var(--muted);font-size:12px;white-space:nowrap}
+  .s-fill{min-width:0}
+  .s-wait,.s-asof{color:var(--muted);font-size:12px;white-space:nowrap;text-align:right;
+     overflow:hidden;text-overflow:ellipsis}
   .s-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:4px 16px 16px;border-top:1px solid var(--line)}
   .s-body h4{margin:12px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
   ul.roster{margin:0;padding:0;list-style:none;columns:2;column-gap:14px}
@@ -227,6 +233,7 @@ function buildDashboard({ config, upcoming, past, history, generatedAt, stats })
   footer code{background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11.5px}
   @media (max-width:860px){
     details.session>summary{grid-template-columns:1fr;gap:6px}
+    .s-wait,.s-asof{text-align:left}
     .s-body{grid-template-columns:1fr}
     ul.roster{columns:1}
     td.what{display:none}
