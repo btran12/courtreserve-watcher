@@ -1,0 +1,34 @@
+{
+  "org": {
+    "id": "17397",
+    "name": "East Hartford Racquet Club",
+    "timezone": "America/New_York"
+  },
+  "match": {
+    "weekdays": ["Mon", "Wed", "Fri"],
+    "startAtOrAfterHour": 19,
+    "eventTypeEquals": "Open Play",
+    "requireExactEventType": true
+  },
+  "poll": {
+    "intervalMinutes": 15,
+    "lookAheadDays": 21,
+    "intensiveWindowHours": 24,
+    "sparseIntervalMinutes": 180,
+    "includePastEvents": false,
+    "requestDelayMs": 700,
+    "maxMonths": 3
+  },
+  "notify": {
+    "toast": true,
+    "toastBatchLimit": 4,
+    "toastTypes": ["joined", "left", "promoted", "demoted", "filled", "opened"],
+    "quietHours": null
+  },
+  "paths": {
+    "stateFile": "data/state.json",
+    "historyFile": "data/history.jsonl",
+    "dashboardFile": "public/index.html",
+    "logFile": "data/watcher.log"
+  }
+}

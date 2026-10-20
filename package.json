@@ -1,0 +1,18 @@
+{
+  "name": "courtreserve-watcher",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Watches the public East Hartford Racquet Club CourtReserve calendar and logs who joins or leaves evening open play sessions.",
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "poll": "node src/index.js",
+    "poll:dry": "node src/index.js --dry-run",
+    "dashboard": "node src/index.js --dashboard-only",
+    "backfill": "node src/index.js --backfill",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=18.14"
+  }
+}
