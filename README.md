@@ -18,11 +18,12 @@ already serves to anonymous visitors.
 ```bat
 cd C:\Users\baotr\GIT\courtreserve-watcher
 
-npm test                 :: 52 unit tests, no network
+npm test                 :: 74 unit tests, no network
 npm run poll             :: one poll cycle, verbose output
-npm run dashboard        :: rebuild public/index.html from stored data
+npm run dashboard        :: rebuild docs/index.html from stored data
+npm run pages            :: rebuild it and push to GitHub Pages now
 
-start public\index.html  :: open the dashboard
+start docs\index.html    :: open the dashboard
 ```
 
 Register the scheduled task (runs every 15 min while you are signed in):
@@ -92,7 +93,8 @@ read calendar (1-2 POSTs)
        diff against stored roster -> emit change records
   -> append to data/history.jsonl, update data/state.json
   -> toast for notifiable changes
-  -> rebuild public/index.html
+  -> rebuild docs/index.html
+  -> commit + push it, only if the data actually changed  ->  GitHub Pages
 ```
 
 ### Request budgeting
@@ -165,6 +167,18 @@ All of it lives in `config.json`.
     "toastBatchLimit": 4,           // max toasts per cycle
     "toastTypes": ["joined","left","promoted","demoted","filled","opened"],
     "quietHours": null              // e.g. {"start":22,"end":7}
+  },
+  "paths": {
+    "stateFile": "data/state.json",
+    "historyFile": "data/history.jsonl",
+    "dashboardFile": "docs/index.html",  // /docs is what GitHub Pages serves
+    "logFile": "data/watcher.log"
+  },
+  "publish": {
+    "enabled": true,                // commit + push the page after each poll
+    "remote": "origin",
+    "branch": "main",
+    "fingerprintFile": "data/.publish-fingerprint"
   }
 }
 ```
@@ -176,16 +190,22 @@ not. This is covered by a test.
 
 ## Data files
 
-| Path                 | Contents                                                        |
-| -------------------- | --------------------------------------------------------------- |
-| `data/state.json`    | latest roster snapshot per occurrence; pruned 14 days after start |
-| `data/history.jsonl` | append-only change log, one JSON object per line — never rewritten |
-| `data/watcher.log`   | plain-text run log                                               |
-| `public/index.html`  | generated dashboard; fully self-contained, opens over `file://`   |
+| Path                        | Contents                                                          |
+| --------------------------- | ----------------------------------------------------------------- |
+| `data/state.json`           | latest roster snapshot per occurrence; pruned 14 days after start  |
+| `data/history.jsonl`        | append-only change log, one JSON object per line — never rewritten |
+| `data/watcher.log`          | plain-text run log                                                 |
+| `data/.publish-fingerprint` | hash of the two files above; gates the Pages push                  |
+| `docs/index.html`           | generated dashboard; fully self-contained, opens over `file://`    |
 
-`data/` is gitignored. **`history.jsonl` and `state.json` contain real members'
-names** — treat them as personal data, keep them local, and do not commit or
-publish them.
+`data/` is gitignored. `docs/index.html` is **committed and published**.
+
+> **Privacy.** All of these files contain real members' names. The raw state and
+> history stay local, but the dashboard renders the same names into
+> `docs/index.html`, which is pushed to a **public** GitHub Pages site by
+> design — see [Publishing](#publishing-to-github-pages). Because git history is
+> permanent, retracting a name later means rewriting history and force-pushing,
+> not merely deleting the file.
 
 Inspect the log by hand:
 
@@ -197,7 +217,7 @@ Get-Content data\history.jsonl -Tail 20
 
 ## Dashboard
 
-`public/index.html` is regenerated on every poll (and by `npm run dashboard`).
+`docs/index.html` is regenerated on every poll (and by `npm run dashboard`).
 
 - **Headline** — the next session, its fill level, and how long until it starts
 - **Stat tiles** — changes / joins / leaves in the last 24h, sessions ahead
@@ -206,11 +226,77 @@ Get-Content data\history.jsonl -Tail 20
 - **Recent activity** — reverse-chronological change log
 - **Recent sessions** — the last 10 that already started
 
-Fill bars are labelled `22/24` rather than relying on bar length alone, and a
-full session carries an explicit `FULL` badge plus a colour change. Status
-marks pair colour with a glyph and a word (`▲ joined`, `▼ left`, `◗ waitlisted`)
-so the dashboard is readable without colour vision. Light and dark themes both
-work via `prefers-color-scheme`.
+Two layout rules are pinned by tests, because both regressed once already:
+
+- **White theme only.** `color-scheme:light` on `:root` and no
+  `prefers-color-scheme` block anywhere, so the page never follows the OS into
+  dark mode.
+- **Every row renders every column.** The summary grid is
+  `170px minmax(0,1fr) 158px 88px 104px` — one flexible track, four fixed — and
+  the waitlist and as-of cells always exist, holding an em dash when empty. CSS
+  grid places children positionally, so a conditional cell used to slide every
+  later cell one track to the left on any session with no waitlist.
+
+The fill bar's `22/24` count sits **beside** the track, not on top of it. Inside
+the bar the digits straddled the fill boundary, where dark ink on `#1d4ed8`
+measured 2.66:1 — unreadable at any partial fill, and only rescued at 100% by a
+white-label special case. Outside it, ink-on-white is 17.85:1 at every level. A
+full session still carries an explicit red `FULL` badge, so it is flagged by
+text and not by colour alone. Status marks likewise pair colour with a glyph and
+a word (`▲ joined`, `▼ left`, `◗ waitlisted`) so the page is readable without
+colour vision.
+
+---
+
+## Publishing to GitHub Pages
+
+The dashboard is one self-contained HTML file — no server, no build step, no
+external assets — so Pages serves it as-is.
+
+**One-time setup**
+
+1. Create an **empty** repo `courtreserve-watcher` under your account: no
+   README, no `.gitignore`, no licence. The local repo already has history.
+2. Point the local repo at it and push:
+
+   ```bat
+   git remote add origin https://github.com/btran12/courtreserve-watcher.git
+   git push -u origin main
+   ```
+
+3. In the repo's **Settings → Pages**, set *Source* to `Deploy from a branch`,
+   *Branch* to `main`, *Folder* to `/docs`.
+4. Push the current page: `npm run pages`.
+
+The site lands at `https://btran12.github.io/courtreserve-watcher/`. Pages
+rebuilds on each push, usually within a minute.
+
+**How the automatic push works**
+
+`src/publish.js` runs at the end of every poll, gated by `publish.enabled` in
+`config.json`. It needs no Task Scheduler change — the already-registered
+`CourtReserveWatcher` task picks it up on its next run.
+
+- **Gated on data, not on HTML.** The page embeds relative timestamps
+  (`as of 12 min ago`), so it differs on every rebuild even when nobody joined
+  or left. Publishing compares a SHA-256 of `data/state.json` +
+  `data/history.jsonl` against `data/.publish-fingerprint` and skips when they
+  match. Idle polls commit nothing; real movement yields a handful of commits a
+  day instead of ~96 commits and ~96 Pages rebuilds.
+- **Commit messages describe the change** — `Wed, Oct 21, 7:15 PM: Toni Strong
+  joined the waitlist` for one, `4 open play change(s)` with a per-change body
+  for several. First sightings read `Start tracking N open play session(s)`, so
+  baselines are never mistaken for member activity.
+- **The fingerprint is written only after a successful push**, so a failure
+  (offline, rejected, auth) leaves the gap intact and the next poll retries it.
+  Publish errors are logged and never fatal — a failed push must not break
+  scraping.
+- **Only `docs/index.html` is staged.** `data/` stays gitignored.
+- **Credentials** come from Git Credential Manager over HTTPS. The task runs
+  `LogonType=Interactive` as you, so cached credentials work without prompting.
+
+`npm run pages` forces a rebuild and push at any time, ignoring the fingerprint.
+Set `publish.enabled: false` to stop automatic publishing.
 
 ---
 
@@ -244,17 +330,22 @@ src/
   store.js         state.json + history.jsonl + run log
   notify.js        Windows toasts, quiet hours, batching
   dashboard.js     static HTML renderer
+  publish.js       fingerprint-gated commit + push to GitHub Pages
   index.js         poll cycle
 scripts/
   register-task.ps1  Task Scheduler registration / removal
   toast.ps1          balloon notification helper
-test/                52 tests over the pure logic (no network)
+docs/
+  index.html         the published dashboard (generated, committed)
+test/                74 tests over the pure logic (no network)
 ```
 
 Tests cover the parts that are easy to get subtly wrong: timezone arithmetic,
 the inclusive 7 PM boundary, case-insensitive name matching, waitlist-vs-roster
-movement not double-counting as a join plus a leave, and the two different
-name-cell markup shapes.
+movement not double-counting as a join plus a leave, the two different name-cell
+markup shapes, the dashboard's fixed column grid and light-only theme, the
+fill-bar label contrast, and the publish fingerprint gate (including that a
+failed push is retried rather than forgotten).
 
 ```bat
 npm test
@@ -272,6 +363,10 @@ npm test
 | rosters come back empty but counts are right | club turned off public registrant display |
 | no toast appears | Windows Focus Assist is on, or notifications are disabled for the app |
 | task never runs | `Get-ScheduledTaskInfo -TaskName CourtReserveWatcher` and check `LastTaskResult` |
+| `publish skipped: no git remote 'origin' configured` | the GitHub repo does not exist yet, or `git remote add origin …` was never run |
+| `ERROR publish: …` in `data/watcher.log` | push failed (auth, rejected, offline). The fingerprint stays unwritten, so the next poll retries on its own |
+| page pushed but the live site is stale | Pages source is not `main` / `/docs`, or the rebuild is still running — check the repo's Actions tab |
+| a commit every 15 min with no member changes | `data/.publish-fingerprint` is missing or unwritable, so the gate cannot see the previous run |
 
 To debug a failing run with a stack trace:
 

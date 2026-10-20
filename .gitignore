@@ -1,8 +1,10 @@
 node_modules/
 
-# Generated at runtime and contains real members' names — never commit.
+# Local runtime state — real members' names, never committed.
 data/
-public/index.html
+
+# Superseded output path; the dashboard now renders to docs/index.html.
+public/
 
 *.log
 .DS_Store

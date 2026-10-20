@@ -9,6 +9,7 @@
     "poll": "node src/index.js",
     "poll:dry": "node src/index.js --dry-run",
     "dashboard": "node src/index.js --dashboard-only",
+    "pages": "node src/index.js --dashboard-only --publish",
     "backfill": "node src/index.js --backfill",
     "test": "node --test"
   },

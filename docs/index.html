@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>East Hartford Racquet Club &mdash; Open Play Watcher</title>
+<style>
+  :root{
+    color-scheme:light;
+    --bg:#ffffff; --surface:#f8fafc; --line:#e2e8f0; --ink:#0f172a; --muted:#64748b;
+    --bar:#1d4ed8; --bar-track:#e2e8f0;
+    --up:#166534; --down:#be123c; --wait:#64748b;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 72px}
+  header h1{margin:0 0 4px;font-size:22px;letter-spacing:-.01em}
+  header .org{color:var(--muted);font-size:13px;margin:0}
+  .lede{margin:20px 0 6px;padding:16px 18px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  .lede .h{font-size:17px;font-weight:650;margin:0 0 3px}
+  .lede .s{color:var(--muted);font-size:13.5px;margin:0}
+  .stats{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:118px}
+  .stat b{display:block;font-size:19px;line-height:1.2}
+  .stat span{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
+  h2{font-size:15px;margin:34px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);
+     text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+  .fill{display:flex;align-items:center;gap:8px;width:100%;max-width:280px;min-width:0}
+  .bar{position:relative;flex:1 1 auto;height:20px;min-width:48px;background:var(--bar-track);
+       border-radius:4px;overflow:hidden;display:block}
+  .bar-fill{position:absolute;inset:0 auto 0 0;background:var(--bar);display:block}
+  .bar-label{flex:0 0 auto;font-size:12px;font-weight:650;line-height:20px;color:var(--ink);white-space:nowrap}
+  .bar-label b{color:var(--down);font-weight:750;letter-spacing:.02em}
+  .bar.is-full .bar-fill{background:var(--down)}
+  .bar-na .bar-label{color:var(--muted)}
+  .denom{color:var(--muted);font-weight:500}
+  details.session{border:1px solid var(--line);border-radius:10px;margin:0 0 8px;background:var(--bg)}
+  details.session>summary{list-style:none;cursor:pointer;padding:11px 14px;display:grid;
+     grid-template-columns:170px minmax(0,1fr) 158px 88px 104px;gap:12px;align-items:center}
+  details.session>summary::-webkit-details-marker{display:none}
+  .s-when{font-weight:650;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .s-name{color:var(--muted);font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .s-fill{min-width:0}
+  .s-wait,.s-asof{color:var(--muted);font-size:12px;white-space:nowrap;text-align:right;
+     overflow:hidden;text-overflow:ellipsis}
+  .s-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;padding:4px 16px 16px;border-top:1px solid var(--line)}
+  .s-body h4{margin:12px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+  ul.roster{margin:0;padding:0;list-style:none;columns:2;column-gap:14px}
+  ul.roster li{break-inside:avoid;padding:2px 0;font-size:13.5px;border-bottom:1px dotted var(--line)}
+  .s-meta dl{margin:0;font-size:13px;display:grid;grid-template-columns:78px 1fr;gap:2px 8px}
+  .s-meta dt{color:var(--muted)}
+  .s-meta dd{margin:0;overflow-wrap:anywhere}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px}
+  table.log{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.log th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+     color:var(--muted);padding:6px 10px;border-bottom:1px solid var(--line);font-weight:600}
+  table.log td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.log tr:hover td{background:var(--surface)}
+  td.when{white-space:nowrap;color:var(--muted)}
+  td.when .ago{display:block;font-size:11.5px}
+  td.mark{white-space:nowrap;font-weight:600}
+  td.mark .glyph{font-size:11px}
+  td.mark.up{color:var(--up)} td.mark.down{color:var(--down)} td.mark.wait{color:var(--wait)}
+  td.who{font-weight:600;white-space:nowrap}
+  td.sess{text-align:right;color:var(--muted);white-space:nowrap}
+  td.sess .sessname{display:block;font-size:11.5px}
+  .empty{color:var(--muted);font-size:13.5px;padding:10px 0}
+  footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+  footer code{background:var(--surface);padding:1px 5px;border-radius:4px;font-size:11.5px}
+  @media (max-width:860px){
+    details.session>summary{grid-template-columns:1fr;gap:6px}
+    .s-wait,.s-asof{text-align:left}
+    .s-body{grid-template-columns:1fr}
+    ul.roster{columns:1}
+    td.what{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Open Play Watcher</h1>
+    <p class="org">East Hartford Racquet Club &middot; org 17397 &middot; America/New York</p>
+  </header>
+
+  <div class="lede">
+    <p class="h">Next: Wed, Oct 21 at 7:15 PM &mdash; EHPR: 6-8 Intermediate Bridge II Open Play</p>
+    <p class="s">12 of 12 registered &middot; starts in 23 hr</p>
+    <div class="stats">
+      <div class="stat"><b>4</b><span>changes 24h</span></div>
+      <div class="stat"><b>0</b><span>joined 24h</span></div>
+      <div class="stat"><b>0</b><span>left 24h</span></div>
+      <div class="stat"><b>15</b><span>sessions ahead</span></div>
+      <div class="stat"><b>15</b><span>events logged</span></div>
+    </div>
+  </div>
+
+  <h2>Upcoming sessions</h2>
+  
+      <details class="session">
+        <summary>
+          <span class="s-when">Wed, Oct 21, 7:15 PM</span>
+          <span class="s-name">EHPR: 6-8 Intermediate Bridge II Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar is-full" role="img" aria-label="12 of 12 spots taken">
+        <span class="bar-fill" style="width:100.0%"></span>
+      </span>
+      <span class="bar-label">12<span class="denom">/12</span> <b>FULL</b></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 4 min ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (12)</h4>
+            <ul class="roster"><li>Bao Nguyen</li><li>Bao Tran</li><li>cuong le</li><li>Huy Dang</li><li>Kevin Bao</li><li>Lan Ngo</li><li>Phu Trinh</li><li>Son Dang</li><li>Thach Le</li><li>Thinh Nguyen</li><li>thomas pham</li><li>Van Truong</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">N9USJAB17397466</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:26 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>0 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/N9USJAB17397466" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Wed, Oct 21, 7:15 PM</span>
+          <span class="s-name">EHPR: 4-6 Intermediate I - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar is-full" role="img" aria-label="12 of 12 spots taken">
+        <span class="bar-fill" style="width:100.0%"></span>
+      </span>
+      <span class="bar-label">12<span class="denom">/12</span> <b>FULL</b></span>
+    </div></span>
+          <span class="s-wait">3 waiting</span>
+          <span class="s-asof">as of 4 min ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (12)</h4>
+            <ul class="roster"><li>Chau Hoang</li><li>Corinne Monfette</li><li>Dung Nguyen</li><li>Elizabeth Pelletier</li><li>Hai Nguyen</li><li>Hieu Nguyen</li><li>Krista Cattanach</li><li>Nga Vuong</li><li>Nhu Nguyen</li><li>Sarah Smiga</li><li>Tien Pham</li><li>Vicky Pham</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (3)</h4>
+            <ul class="roster"><li>Toni Strong</li><li>Trieu Nguyen</li><li>Binh Tran</li></ul>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">1LEUZSK17397732</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:26 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>0 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/1LEUZSK17397732" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Fri, Oct 23, 7:15 PM</span>
+          <span class="s-name">EHPR: 6-8 Intermediate Bridge II Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar is-full" role="img" aria-label="12 of 12 spots taken">
+        <span class="bar-fill" style="width:100.0%"></span>
+      </span>
+      <span class="bar-label">12<span class="denom">/12</span> <b>FULL</b></span>
+    </div></span>
+          <span class="s-wait">1 waiting</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (12)</h4>
+            <ul class="roster"><li>Bao Nguyen</li><li>Bao Tran</li><li>cuong le</li><li>Hieu Nguyen</li><li>Huy Dang</li><li>kevin tran</li><li>Lan Ngo</li><li>Phu Trinh</li><li>Son Dang</li><li>Thach Le</li><li>Thinh Nguyen</li><li>Van Truong</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (1)</h4>
+            <ul class="roster"><li>Long Nguyen</li></ul>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">RMV4JNY17397378</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:26 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>0 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/RMV4JNY17397378" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Fri, Oct 23, 7:15 PM</span>
+          <span class="s-name">EHPR: 4-6 Intermediate I - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="11 of 12 spots taken">
+        <span class="bar-fill" style="width:91.7%"></span>
+      </span>
+      <span class="bar-label">11<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (11)</h4>
+            <ul class="roster"><li>Binh Tran</li><li>Chau Hoang</li><li>Duong Pham</li><li>Hai Nguyen</li><li>Kevin Bao</li><li>Nga Vuong</li><li>Nhu Nguyen</li><li>Susan Nguyen</li><li>Tien Pham</li><li>Vi Nguyen</li><li>Vicky Pham</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">G9H9PAO17397641</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:26 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>1 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/G9H9PAO17397641" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Mon, Oct 26, 7:15 PM</span>
+          <span class="s-name">EHPR: 5-7 - Intermediate II - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="22 of 24 spots taken">
+        <span class="bar-fill" style="width:91.7%"></span>
+      </span>
+      <span class="bar-label">22<span class="denom">/24</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (22)</h4>
+            <ul class="roster"><li>Bao Nguyen</li><li>Bao Tran</li><li>Binh Tran</li><li>Chau Hoang</li><li>cuong le</li><li>Dean Vu</li><li>Dung Nguyen</li><li>Duong Pham</li><li>Hieu Nguyen</li><li>Huy Dang</li><li>Kevin Bao</li><li>Lan Ngo</li><li>Long Nguyen</li><li>Nga Vuong</li><li>Nhu Nguyen</li><li>Phu Trinh</li><li>Ralph Phan</li><li>Susan Nguyen</li><li>Thach Le</li><li>Thinh Nguyen</li><li>Van Truong</li><li>Vicky Pham</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">LORHN2L17397153</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:26 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>2 of 24 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/LORHN2L17397153" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Wed, Oct 28, 7:15 PM</span>
+          <span class="s-name">EHPR: 6-8 Intermediate Bridge II Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="9 of 12 spots taken">
+        <span class="bar-fill" style="width:75.0%"></span>
+      </span>
+      <span class="bar-label">9<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (9)</h4>
+            <ul class="roster"><li>Bao Nguyen</li><li>Bao Tran</li><li>cuong le</li><li>Dung Nguyen</li><li>Huy Dang</li><li>Lan Ngo</li><li>Phu Trinh</li><li>Thinh Nguyen</li><li>Van Truong</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">369KGUB17397504</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>3 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/369KGUB17397504" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Wed, Oct 28, 7:15 PM</span>
+          <span class="s-name">EHPR: 4-6 Intermediate I - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="6 of 12 spots taken">
+        <span class="bar-fill" style="width:50.0%"></span>
+      </span>
+      <span class="bar-label">6<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (6)</h4>
+            <ul class="roster"><li>Cassia Cogger</li><li>Chau Hoang</li><li>Duong Pham</li><li>Kevin Bao</li><li>Nga Vuong</li><li>Nhu Nguyen</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">U5MMZHA17397767</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>6 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/U5MMZHA17397767" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Fri, Oct 30, 7:15 PM</span>
+          <span class="s-name">EHPR: 4-6 Intermediate I - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="4 of 12 spots taken">
+        <span class="bar-fill" style="width:33.3%"></span>
+      </span>
+      <span class="bar-label">4<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (4)</h4>
+            <ul class="roster"><li>Dung Nguyen</li><li>Huy Dang</li><li>Nga Vuong</li><li>Nhu Nguyen</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">MBF8SDP17397673</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>8 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/MBF8SDP17397673" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Fri, Oct 30, 7:15 PM</span>
+          <span class="s-name">EHPR: 6-8 Intermediate Bridge II Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="7 of 12 spots taken">
+        <span class="bar-fill" style="width:58.3%"></span>
+      </span>
+      <span class="bar-label">7<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (7)</h4>
+            <ul class="roster"><li>Bao Nguyen</li><li>Bao Tran</li><li>cuong le</li><li>Lan Ngo</li><li>Phu Trinh</li><li>Thinh Nguyen</li><li>Van Truong</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">P9OSHP417397417</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>5 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/P9OSHP417397417" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Mon, Nov 2, 7:15 PM</span>
+          <span class="s-name">EHPR: 5-7 - Intermediate II - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="6 of 24 spots taken">
+        <span class="bar-fill" style="width:25.0%"></span>
+      </span>
+      <span class="bar-label">6<span class="denom">/24</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (6)</h4>
+            <ul class="roster"><li>Dean Vu</li><li>Hieu Nguyen</li><li>Lan Ngo</li><li>Nga Vuong</li><li>Ralph Phan</li><li>Thach Le</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">HEIDQ4S17397194</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>18 of 24 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/HEIDQ4S17397194" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Wed, Nov 4, 7:15 PM</span>
+          <span class="s-name">EHPR: 4-6 Intermediate I - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="0 of 12 spots taken">
+        <span class="bar-fill" style="width:0.0%"></span>
+      </span>
+      <span class="bar-label">0<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (0)</h4>
+            <p class="empty">No one registered yet.</p>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">3F47HXL17397811</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>12 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/3F47HXL17397811" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Wed, Nov 4, 7:15 PM</span>
+          <span class="s-name">EHPR: 6-8 Intermediate Bridge II Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="0 of 12 spots taken">
+        <span class="bar-fill" style="width:0.0%"></span>
+      </span>
+      <span class="bar-label">0<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (0)</h4>
+            <p class="empty">No one registered yet.</p>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">B9SF1MW17397547</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>12 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/B9SF1MW17397547" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Fri, Nov 6, 7:15 PM</span>
+          <span class="s-name">EHPR: 4-6 Intermediate I - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="0 of 12 spots taken">
+        <span class="bar-fill" style="width:0.0%"></span>
+      </span>
+      <span class="bar-label">0<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (0)</h4>
+            <p class="empty">No one registered yet.</p>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">QVI8K8T17397705</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>12 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/QVI8K8T17397705" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Fri, Nov 6, 7:15 PM</span>
+          <span class="s-name">EHPR: 6-8 Intermediate Bridge II Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="0 of 12 spots taken">
+        <span class="bar-fill" style="width:0.0%"></span>
+      </span>
+      <span class="bar-label">0<span class="denom">/12</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (0)</h4>
+            <p class="empty">No one registered yet.</p>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">UGF1JLL17397450</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>12 of 12 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/UGF1JLL17397450" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+      <details class="session">
+        <summary>
+          <span class="s-when">Mon, Nov 9, 7:15 PM</span>
+          <span class="s-name">EHPR: 5-7 - Intermediate II - Open Play</span>
+          <span class="s-fill"><div class="fill">
+      <span class="bar" role="img" aria-label="4 of 24 spots taken">
+        <span class="bar-fill" style="width:16.7%"></span>
+      </span>
+      <span class="bar-label">4<span class="denom">/24</span></span>
+    </div></span>
+          <span class="s-wait">—</span>
+          <span class="s-asof">as of 1 hr ago</span>
+        </summary>
+        <div class="s-body">
+          <div class="s-col">
+            <h4>Registered (4)</h4>
+            <ul class="roster"><li>Hieu Nguyen</li><li>Lan Ngo</li><li>Ralph Phan</li><li>Thach Le</li></ul>
+          </div>
+          <div class="s-col">
+            <h4>Waitlist (0)</h4>
+            <p class="empty">Waitlist empty.</p>
+          </div>
+          <div class="s-col s-meta">
+            <h4>Session</h4>
+            <dl>
+              <dt>Type</dt><dd>Open Play</dd>
+              <dt>Key</dt><dd class="mono">AN9PKSI17397230</dd>
+              <dt>First seen</dt><dd>Oct 20, 6:27 PM</dd>
+              <dt>Last change</dt><dd>1 hr ago</dd>
+              <dt>Portal says</dt><dd>20 of 24 spots remaining</dd>
+              <dt>Details</dt><dd><a href="https://app.courtreserve.com/Online/Events/Details/17397/AN9PKSI17397230" rel="noopener">open in CourtReserve</a></dd>
+            </dl>
+          </div>
+        </div>
+      </details>
+
+  <h2>Recent activity</h2>
+  <div style="overflow-x:auto"><table class="log">
+      <thead><tr><th>When</th><th>Change</th><th>Who</th><th>Detail</th><th>Session</th></tr></thead>
+      <tbody><tr>
+        <td class="when"><span title="2026-10-20T22:36:34.248Z">Oct 20, 6:36 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">◗</span> waitlisted</td>
+        <td class="who">Long Nguyen</td>
+        <td class="what">Long Nguyen joined the waitlist</td>
+        <td class="sess">Fri, Oct 23, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:36:31.441Z">Oct 20, 6:36 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">◗</span> waitlisted</td>
+        <td class="who">Toni Strong</td>
+        <td class="what">Toni Strong joined the waitlist</td>
+        <td class="sess">Wed, Oct 21, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:36:31.441Z">Oct 20, 6:36 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">◗</span> waitlisted</td>
+        <td class="who">Trieu Nguyen</td>
+        <td class="what">Trieu Nguyen joined the waitlist</td>
+        <td class="sess">Wed, Oct 21, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:36:31.441Z">Oct 20, 6:36 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">◗</span> waitlisted</td>
+        <td class="who">Binh Tran</td>
+        <td class="what">Binh Tran joined the waitlist</td>
+        <td class="sess">Wed, Oct 21, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:24.882Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 4 of 24 registered</td>
+        <td class="sess">Mon, Nov 9, 7:15 PM<span class="sessname">EHPR: 5-7 - Intermediate II - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:22.303Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 0 of 12 registered</td>
+        <td class="sess">Fri, Nov 6, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:19.718Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 0 of 12 registered</td>
+        <td class="sess">Fri, Nov 6, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:16.939Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 0 of 12 registered</td>
+        <td class="sess">Wed, Nov 4, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:14.412Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 0 of 12 registered</td>
+        <td class="sess">Wed, Nov 4, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:11.725Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 6 of 24 registered</td>
+        <td class="sess">Mon, Nov 2, 7:15 PM<span class="sessname">EHPR: 5-7 - Intermediate II - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:08.981Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 7 of 12 registered</td>
+        <td class="sess">Fri, Oct 30, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:06.296Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 4 of 12 registered</td>
+        <td class="sess">Fri, Oct 30, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:03.846Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 6 of 12 registered</td>
+        <td class="sess">Wed, Oct 28, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:27:01.457Z">Oct 20, 6:27 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 9 of 12 registered</td>
+        <td class="sess">Wed, Oct 28, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:26:59.066Z">Oct 20, 6:26 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 22 of 24 registered</td>
+        <td class="sess">Mon, Oct 26, 7:15 PM<span class="sessname">EHPR: 5-7 - Intermediate II - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:26:56.209Z">Oct 20, 6:26 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 11 of 12 registered</td>
+        <td class="sess">Fri, Oct 23, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:26:53.662Z">Oct 20, 6:26 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 12 of 12 registered</td>
+        <td class="sess">Fri, Oct 23, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:26:51.148Z">Oct 20, 6:26 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 12 of 12 registered</td>
+        <td class="sess">Wed, Oct 21, 7:15 PM<span class="sessname">EHPR: 4-6 Intermediate I - Open Play</span></td>
+      </tr><tr>
+        <td class="when"><span title="2026-10-20T22:26:48.710Z">Oct 20, 6:26 PM</span><span class="ago">1 hr ago</span></td>
+        <td class="mark wait"><span class="glyph" aria-hidden="true">•</span> tracking on</td>
+        <td class="who"></td>
+        <td class="what">tracking started with 12 of 12 registered</td>
+        <td class="sess">Wed, Oct 21, 7:15 PM<span class="sessname">EHPR: 6-8 Intermediate Bridge II Open Play</span></td>
+      </tr></tbody></table></div>
+
+  <h2>Recent sessions</h2>
+  <p class="empty">Nothing tracked yet.</p>
+
+  <footer>
+    <p>Rule: Mon/Wed/Fri open play starting at or after 7:00 PM. Polling every 15 min, looking 21 days ahead.</p>
+    <p>Generated Oct 20, 7:49 PM (just now).
+       Source: the club's public CourtReserve calendar &mdash; counts and registrant names are whatever the portal
+       exposed at each poll. A member who joins <em>and</em> leaves between two polls is never seen.</p>
+    <p>Regenerate with <code>npm run dashboard</code>. Raw log: <code>data/history.jsonl</code>.</p>
+  </footer>
+</div>
+</body>
+</html>

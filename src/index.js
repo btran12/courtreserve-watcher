@@ -10,6 +10,7 @@ const { diffEvent, isNotifiable } = require('./diff');
 const { Store } = require('./store');
 const { notifyChanges } = require('./notify');
 const { buildDashboard } = require('./dashboard');
+const { publish } = require('./publish');
 
 const loadConfig = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
 
@@ -19,6 +20,7 @@ function parseArgs(argv) {
     dryRun: flags.has('--dry-run'),
     dashboardOnly: flags.has('--dashboard-only'),
     backfill: flags.has('--backfill'),
+    publish: flags.has('--publish'),
     verbose: flags.has('--verbose') || flags.has('-v'),
     quiet: flags.has('--quiet'),
   };
@@ -52,6 +54,9 @@ async function main() {
   if (args.dashboardOnly) {
     renderDashboard({ config, store, tz, log });
     log(`dashboard rebuilt -> ${config.paths.dashboardFile}`);
+    if (args.publish) {
+      publish({ root: ROOT, config, log, force: true, dryRun: args.dryRun });
+    }
     return;
   }
 
@@ -181,6 +186,15 @@ async function main() {
   }
 
   renderDashboard({ config, store, tz, log, generatedAt: now });
+
+  publish({
+    root: ROOT,
+    config,
+    log,
+    historyEntries,
+    force: args.publish,
+    dryRun: args.dryRun,
+  });
 
   log(
     `done: ${scraped} scraped, ${skipped} not due, ${failed} failed, ${historyEntries.length} change(s), ` +

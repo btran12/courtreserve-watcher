@@ -28,7 +28,13 @@
   "paths": {
     "stateFile": "data/state.json",
     "historyFile": "data/history.jsonl",
-    "dashboardFile": "public/index.html",
+    "dashboardFile": "docs/index.html",
     "logFile": "data/watcher.log"
+  },
+  "publish": {
+    "enabled": true,
+    "remote": "origin",
+    "branch": "main",
+    "fingerprintFile": "data/.publish-fingerprint"
   }
 }
