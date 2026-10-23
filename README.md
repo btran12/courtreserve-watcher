@@ -1,17 +1,110 @@
-# CourtReserve Watcher
+# 🏓 CourtReserve Watcher
 
-Userscript that runs on the CourtReserve calendar page, tracks registrants and waitlist for **Mon/Wed/Fri events starting at/after 7:00pm** (next 4 weeks), merges events sharing the same date + start time, and logs joins/leaves/promotions between visits. State lives in `localStorage`.
+Automated 24/7 background scanner for CourtReserve event schedules and registrant lists. 
 
-## Install
-1. Install Tampermonkey (or Violentmonkey) in your browser.
-2. Create a new script, paste `courtreserve-watcher.user.js`, save.
-3. Open https://app.courtreserve.com/Online/Calendar/Events/17397/Day — a 🏓 **Watcher** button appears bottom-right. The first visit sets the baseline; later visits log diffs and auto-open the panel when something changed.
+It tracks evening events (Monday, Wednesday, Friday after 7:00 PM), monitors registrations and waitlists, logs roster changes (joins, leaves, waitlist promotions), and uploads state updates to AWS for real-time viewing.
 
-(No Tampermonkey? Paste the file's contents into the DevTools console on that page; it runs once per paste.)
+---
 
-## Why a userscript
-The CourtReserve API sends no CORS headers and sits behind Cloudflare, so a standalone web page can't read it. Running on the site's own origin avoids both issues.
+## 🏗️ Architecture
 
-## Tweaks
-Edit `CONFIG` at the top of the script: `days` (0=Sun), `startAtOrAfterMinutes`, `weeksAhead`.
-Log types: joined, left, waitlist joined/left, promoted (waitlist → registered), demoted. Failed fetches keep the previous snapshot, so errors never show up as fake "leaves".
+```
+┌─────────────────────────┐
+│ CourtReserve Web Server │ (Public calendar & details)
+└───────────▲─────────────┘
+            │ 1. Fetches calendar & participant tables
+┌───────────┴─────────────┐
+│ GitHub Actions Runner   │ (Runs watcher.js every 15 min)
+└───────────┬─────────────┘
+            │ 2. Computes diffs & posts updated state.json
+┌───────────▼─────────────┐
+│ AWS Lambda & S3 Bucket  │ (Backend storage)
+└───────────┬─────────────┘
+            │ 3. Serves latest data
+┌───────────▼─────────────┐
+│ Web Viewer UI           │ (Mobile-optimized web frontend)
+└─────────────────────────┘
+```
+
+---
+
+## 📁 Repository Structure
+
+```
+.
+├── .github/
+│   └── workflows/
+│       └── watcher.yml    # GitHub Actions cron schedule (runs every 15 mins)
+├── package.json           # Node.js dependencies
+├── watcher.js             # Core Node.js scraper & diffing engine
+└── README.md              # Project documentation
+```
+
+---
+
+## ⚙️ How It Works
+
+1. **Scheduled Runs**: GitHub Actions runs `watcher.js` every 15 minutes using Node.js.
+2. **Fetch History**: The script downloads the current `state.json` from the CloudFront distribution to maintain state continuity.
+3. **Scan Events**: It scans the upcoming 4 weeks of the CourtReserve calendar for organization `17397`.
+4. **Scrape Registrants**: For matching slots (Mon/Wed/Fri starting at or after 7:00 PM), it extracts participant and waitlist tables.
+5. **Diff & Log**: It compares current participant lists with historical snapshots to detect:
+   - ➕ **Joined** / **Waitlist Joined**
+   - ➖ **Left** / **Waitlist Left**
+   - ⬆️ **Promoted** (Moved from waitlist to registered)
+   - ⬇️ **Demoted** (Moved from registered to waitlist)
+6. **Upload**: It uploads the refreshed state and change logs back to the AWS Lambda endpoint using a secure header token.
+
+---
+
+## 🚀 Setup & Installation
+
+### 1. Local Setup
+To run the script locally on your machine:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/YOUR_USERNAME/courtreserve-watcher.git
+cd courtreserve-watcher
+
+# 2. Install dependencies
+npm install
+
+# 3. Run the watcher manually
+node watcher.js
+```
+
+### 2. GitHub Actions Automation
+1. Push all files (`watcher.js`, `package.json`, and `.github/workflows/watcher.yml`) to your GitHub repository.
+2. Ensure GitHub Actions is enabled under **Settings > Actions > General > Allow all actions**.
+3. The workflow will run automatically every 15 minutes. You can also trigger it manually from the **Actions** tab by selecting **CourtReserve Watcher Automated Scan** and clicking **Run workflow**.
+
+---
+
+## ⚙️ Configuration Options
+
+You can adjust tracking filters directly in `watcher.js` inside the `CONFIG` object:
+
+```javascript
+const CONFIG = {
+  orgId: '17397',                      // CourtReserve Organization ID
+  days: [1, 3, 5],                     // Target days: 0=Sun, 1=Mon, ..., 6=Sat
+  startAtOrAfterMinutes: 19 * 60,      // Filter events starting at or after 7:00 PM
+  weeksAhead: 4,                       // Number of weeks ahead to scan
+  maxLogEntries: 3000,                 // Maximum log history retained
+  concurrency: 3,                      // Parallel HTTP request limit
+  stateUrl: '...',                     // Public CloudFront URL for historical state
+  upload: { 
+    url: '...',                        // AWS Lambda endpoint URL
+    token: '...',                      // Authorization token header
+    maxLog: 500 
+  }
+};
+```
+
+---
+
+## 📱 Viewing Results
+
+Access the viewer interface from any desktop or mobile browser at:
+`https://d22bq7zsasshul.cloudfront.net/viewer.html`
