@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CourtReserve Watcher</title>
+<style>
+  body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f9;color:#222}
+  header{background:#284b73;color:#fff;padding:12px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  header h1{font-size:18px;margin:0;flex:1}
+  header button{background:#fff2;color:#fff;border:1px solid #fff6;border-radius:4px;padding:4px 10px;cursor:pointer}
+  main{max-width:1100px;margin:16px auto;padding:0 16px}
+  .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px #0002;padding:12px 16px;margin-bottom:12px}
+  .latest{background:#fff3c4;border-left:4px solid #f5a300}
+  .tag{background:#f5a300;color:#fff;border-radius:8px;padding:1px 8px;font-size:11px;margin-left:8px}
+  .time{color:#777;font-size:12px}
+  .cols{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:16px;margin-top:8px}
+  .cols>div{min-width:0;overflow-wrap:anywhere}
+  ol{margin:4px 0;padding-left:22px}
+  .j{color:#1b7f3b}.l{color:#c62828}.w{color:#b26a00}
+  .row{padding:3px 0;overflow-wrap:anywhere}
+  .err{color:#c62828}
+  @media(max-width:700px){.cols{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🏓 CourtReserve Watcher — Mon/Wed/Fri after 7pm</h1>
+  <span id="status" class="time" style="color:#fff"></span>
+  <button id="reload">Reload</button>
+</header>
+<main id="app">Loading…</main>
+<script>
+// Served from the CloudFront stack, state.json is same-origin. Override with ?src=<url> or set DATA_URL for other hosting.
+const DATA_URL = 'https://d22bq7zsasshul.cloudfront.net/courtreserve-watcher/state.json';
+const src = new URLSearchParams(location.search).get('src') || DATA_URL || (location.protocol.startsWith('http') ? 'courtreserve-watcher/state.json' : '');
+
+const ICON = { joined: '➕', left: '➖', 'waitlist-joined': '⏳', 'waitlist-left': '🚪', promoted: '⬆️', demoted: '⬇️', removed: '🗑️' };
+const TEXT = { joined: 'joined', left: 'left', 'waitlist-joined': 'joined the waitlist', 'waitlist-left': 'left the waitlist',
+  promoted: 'moved from waitlist to registered', demoted: 'moved from registered to waitlist', removed: 'event no longer listed' };
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cls = (t) => (t === 'joined' || t === 'promoted' ? 'j' : t === 'left' || t === 'removed' ? 'l' : 'w');
+const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`; };
+const label = (s) => `${new Date(`${s.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ${fmtTime(s.time)}`;
+const open = new Set();
+
+function render(d) {
+  const log = (d.log || []).filter((l) => l.type !== 'tracking');
+  const last = {};
+  log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
+  const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
+  const list = (s, st) => {
+    const li = Object.entries(s.people).filter(([, p]) => p.status === st).map(([n]) => n).sort().map((n) => `<li>${esc(n)}</li>`).join('');
+    return li ? `<ol>${li}</ol>` : '<div>—</div>';
+  };
+  const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).length;
+  const slots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key)).map((s) => {
+    const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
+      `<div class="row"><span class="${cls(l.type)}">${ICON[l.type] || ''} <b>${esc(l.name)}</b> ${esc(TEXT[l.type] || l.type)}</span><div class="time">${new Date(l.ts).toLocaleString()}</div></div>`).join('') || '<div class="time">No changes yet</div>';
+    return `<details class="card ${s.key === latest ? 'latest' : ''}" data-key="${esc(s.key)}" ${open.has(s.key) || s.key === latest ? 'open' : ''}>
+      <summary><b>${esc(label(s))}</b> — ${count(s, 'reg')} registered, ${count(s, 'wait')} waitlisted
+      ${s.key === latest ? `<span class="tag">Most recently updated · ${new Date(last[s.key]).toLocaleString()}</span>` : ''}
+      <div class="time">${esc((s.events || []).join(' / '))}</div></summary>
+      <div class="cols"><div><b>Registered</b>${list(s, 'reg')}</div><div><b>Waitlist</b>${list(s, 'wait')}</div><div><b>Joined / left</b>${ch}</div></div></details>`;
+  }).join('') || '<div class="card">No tracked events.</div>';
+  const full = log.slice(0, 300).map((l) =>
+    `<div class="row"><span class="${cls(l.type)}">${ICON[l.type] || ''} <b>${esc(l.name)}</b> ${esc(TEXT[l.type] || l.type)}</span>
+     <div class="time">${esc(l.label)} · ${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div></div>`).join('') || '<div class="time">No changes recorded yet.</div>';
+  document.getElementById('app').innerHTML = `<h3>Tracked events</h3>${slots}<h3>Change log</h3><div class="card">${full}</div>`;
+  document.getElementById('status').textContent = d.updated ? `Last checked ${new Date(d.updated).toLocaleString()}` : '';
+}
+
+async function load() {
+  const app = document.getElementById('app');
+  if (!src) { app.innerHTML = '<div class="card err">Set DATA_URL in this file or open with ?src=&lt;url to state.json&gt;</div>'; return; }
+  try {
+    const r = await fetch(`${src}${src.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    render(await r.json());
+  } catch (e) { app.innerHTML = `<div class="card err">Failed to load data: ${esc(e.message)} (check bucket CORS / URL)</div>`; }
+}
+document.getElementById('app').addEventListener('toggle', (e) => {
+  const k = e.target.dataset && e.target.dataset.key; if (!k) return;
+  e.target.open ? open.add(k) : open.delete(k);
+}, true);
+document.getElementById('reload').onclick = load;
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+setInterval(load, 60000);
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CourtReserve Watcher - Lambda ingest (Function URL) -> private S3 -> CloudFront (serves viewer.html + state.json)
+
+Parameters:
+  UploadToken:
+    Type: String
+    NoEcho: true
+    MinLength: 16
+    Description: Secret the userscript sends in the X-Watcher-Token header (use a long random string).
+
+Resources:
+  Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  OAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    DeletionPolicy: Retain
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    DeletionPolicy: Retain
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: viewer.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2
+        Origins:
+          - Id: s3
+            DomainName: !GetAtt Bucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OAC.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+        DefaultCacheBehavior:
+          TargetOriginId: s3
+          ViewerProtocolPolicy: redirect-to-https
+          # Managed: CachingDisabled, so state.json is always fresh
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+          Compress: true
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub '${Bucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+  IngestRole:
+    Type: AWS::IAM::Role
+    DeletionPolicy: Retain
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Policies:
+        - PolicyName: put-state
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:PutObject
+                Resource: !Sub '${Bucket.Arn}/courtreserve-watcher/state.json'
+
+  IngestFunction:
+    Type: AWS::Lambda::Function
+    DeletionPolicy: Retain
+    Properties:
+      Runtime: nodejs24.x
+      Handler: index.handler
+      Timeout: 15
+      MemorySize: 128
+      Role: !GetAtt IngestRole.Arn
+      Environment:
+        Variables:
+          BUCKET: !Ref Bucket
+          TOKEN: !Ref UploadToken
+          KEY: courtreserve-watcher/state.json
+      Code:
+        ZipFile: |
+          const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+          const { timingSafeEqual } = require('node:crypto');
+          const s3 = new S3Client({});
+          const MAX = 2 * 1024 * 1024;
+          const same = (a, b) => {
+            const x = Buffer.from(a || ''), y = Buffer.from(b || '');
+            return x.length === y.length && timingSafeEqual(x, y);
+          };
+          exports.handler = async (event) => {
+            const h = event.headers || {};
+            if (!same(h['x-watcher-token'], process.env.TOKEN)) return { statusCode: 401, body: 'unauthorized' };
+            const raw = event.isBase64Encoded ? Buffer.from(event.body || '', 'base64').toString() : (event.body || '');
+            if (raw.length > MAX) return { statusCode: 413, body: 'too large' };
+            let d;
+            try { d = JSON.parse(raw); } catch (e) { return { statusCode: 400, body: 'bad json' }; }
+            if (!d || typeof d.snapshots !== 'object' || !Array.isArray(d.log)) return { statusCode: 400, body: 'bad shape' };
+            await s3.send(new PutObjectCommand({
+              Bucket: process.env.BUCKET,
+              Key: process.env.KEY,
+              Body: JSON.stringify({ ...d, uploadedAt: Date.now() }),
+              ContentType: 'application/json',
+              CacheControl: 'no-cache',
+            }));
+            return { statusCode: 200, body: 'ok' };
+          };
+
+  FunctionUrl:
+    Type: AWS::Lambda::Url
+    DeletionPolicy: Retain
+    Properties:
+      TargetFunctionArn: !GetAtt IngestFunction.Arn
+      AuthType: NONE
+
+  UrlInvokePermission:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: !Ref IngestFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  UrlInvokePermission2:
+    Type: AWS::Lambda::Permission
+    DeletionPolicy: Retain
+    Properties:
+      FunctionName: !Ref IngestFunction
+      Action: lambda:InvokeFunction
+      Principal: '*'
+      InvokedViaFunctionUrl: true
+
+Outputs:
+  UploadUrl:
+    Description: Put this in CONFIG.upload.url in the userscript
+    Value: !GetAtt FunctionUrl.FunctionUrl
+  BucketName:
+    Description: Upload viewer.html to the root of this bucket
+    Value: !Ref Bucket
+  ViewerUrl:
+    Description: Open this to view the data
+    Value: !Sub 'https://${Distribution.DomainName}/viewer.html'
