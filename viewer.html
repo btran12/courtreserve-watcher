@@ -2,42 +2,389 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>CourtReserve Watcher</title>
+<!-- Google Fonts & Material Symbols -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
 <style>
-  body{font:14px system-ui,sans-serif;margin:0;background:#f4f6f9;color:#222}
-  header{background:#284b73;color:#fff;padding:12px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  header h1{font-size:18px;margin:0;flex:1}
-  header button{background:#fff2;color:#fff;border:1px solid #fff6;border-radius:4px;padding:4px 10px;cursor:pointer}
-  main{max-width:1100px;margin:16px auto;padding:0 16px}
-  .card{background:#fff;border-radius:8px;box-shadow:0 1px 4px #0002;padding:12px 16px;margin-bottom:12px}
-  .latest{background:#fff3c4;border-left:4px solid #f5a300}
-  .tag{background:#f5a300;color:#fff;border-radius:8px;padding:1px 8px;font-size:11px;margin-left:8px}
-  .time{color:#777;font-size:12px}
-  .cols{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:16px;margin-top:8px}
-  .cols>div{min-width:0;overflow-wrap:anywhere}
-  ol{margin:4px 0;padding-left:22px}
-  .j{color:#1b7f3b}.l{color:#c62828}.w{color:#b26a00}
-  .row{padding:3px 0;overflow-wrap:anywhere}
-  .err{color:#c62828}
-  @media(max-width:700px){.cols{grid-template-columns:1fr}}
+  :root {
+    --md-primary: #1976d2;
+    --md-primary-variant: #1565c0;
+    --md-bg: #f8f9fa;
+    --md-surface: #ffffff;
+    --md-on-surface: #1f1f1f;
+    --md-on-surface-variant: #616161;
+    --md-outline: #e0e0e0;
+    
+    --color-join: #2e7d32;
+    --bg-join: #e8f5e9;
+    --color-left: #c62828;
+    --bg-left: #ffebee;
+    --color-wait: #ed6c02;
+    --bg-wait: #fff3e0;
+
+    --radius-card: 16px;
+    --radius-chip: 8px;
+    --shadow-1: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.12);
+    --shadow-2: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    background-color: var(--md-bg);
+    color: var(--md-on-surface);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding-bottom: 24px;
+  }
+
+  /* App Bar Header */
+  header {
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--md-outline);
+  }
+
+  .header-title-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  .app-icon {
+    font-size: 28px;
+    line-height: 1;
+    background: #e3f2fd;
+    padding: 8px;
+    border-radius: 12px;
+    color: var(--md-primary);
+    flex-shrink: 0;
+  }
+
+  .header-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  header h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--md-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .last-updated {
+    font-size: 0.75rem;
+    color: var(--md-on-surface-variant);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* Icon Button */
+  .icon-btn {
+    background: transparent;
+    border: none;
+    color: var(--md-primary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+  }
+
+  .icon-btn:hover { background: rgba(25, 118, 210, 0.08); }
+  .icon-btn:active { background: rgba(25, 118, 210, 0.2); }
+  .icon-btn.spinning .material-symbols-outlined {
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin { 100% { transform: rotate(360deg); } }
+
+  main {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+
+  .section-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--md-on-surface-variant);
+    margin: 20px 0 10px 4px;
+  }
+
+  /* Material Card & Details */
+  details.card {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-1);
+    margin-bottom: 12px;
+    border: 1px solid var(--md-outline);
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+
+  details.card[open] {
+    box-shadow: var(--shadow-2);
+    border-color: #bbdefb;
+  }
+
+  details.card.latest {
+    border: 2px solid #ffa726;
+  }
+
+  summary {
+    padding: 14px 16px;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    user-select: none;
+    position: relative;
+  }
+
+  summary::-webkit-details-marker { display: none; }
+
+  .summary-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .summary-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--md-on-surface);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .expand-icon {
+    color: var(--md-on-surface-variant);
+    transition: transform 0.2s ease;
+  }
+
+  details[open] summary .expand-icon {
+    transform: rotate(180deg);
+  }
+
+  .badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-top: 2px;
+  }
+
+  .chip {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: var(--radius-chip);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .chip-reg { background: #e3f2fd; color: #1565c0; }
+  .chip-wait { background: #fff3e0; color: #e65100; }
+  .chip-latest { background: #fff8e1; color: #b78103; border: 1px solid #ffe082; font-weight: 700; }
+
+  .event-subtitle {
+    font-size: 0.8rem;
+    color: var(--md-on-surface-variant);
+  }
+
+  /* Card Content */
+  .card-body {
+    padding: 0 16px 16px 16px;
+    border-top: 1px solid var(--md-outline);
+    background: #fafafa;
+  }
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .col-box {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline);
+    border-radius: 12px;
+    padding: 12px;
+  }
+
+  .col-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--md-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  ol.people-list {
+    margin: 0;
+    padding-left: 20px;
+    font-size: 0.875rem;
+  }
+
+  ol.people-list li {
+    padding: 2px 0;
+  }
+
+  .empty-state {
+    color: #9e9e9e;
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  /* Activity Feed / Log Row */
+  .log-card {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--md-outline);
+    padding: 8px 16px;
+    box-shadow: var(--shadow-1);
+  }
+
+  .row {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .row:last-child { border-bottom: none; }
+
+  .row-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.875rem;
+  }
+
+  .action-chip {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .j { background: var(--bg-join); color: var(--color-join); }
+  .l { background: var(--bg-left); color: var(--color-left); }
+  .w { background: var(--bg-wait); color: var(--color-wait); }
+
+  .time {
+    color: var(--md-on-surface-variant);
+    font-size: 0.75rem;
+  }
+
+  .err {
+    background: var(--bg-left);
+    color: var(--color-left);
+    padding: 16px;
+    border-radius: var(--radius-card);
+    font-weight: 500;
+  }
+
+  /* Responsive Design for Mobile */
+  @media (max-width: 768px) {
+    header { padding: 10px 12px; }
+    main { padding: 12px 8px; }
+    .cols { grid-template-columns: 1fr; gap: 10px; }
+    summary { padding: 12px; }
+    .card-body { padding: 0 12px 12px 12px; }
+    .header-title-group { gap: 8px; }
+    header h1 { font-size: 0.95rem; }
+  }
 </style>
 </head>
 <body>
+
 <header>
-  <h1>🏓 CourtReserve Watcher — Mon/Wed/Fri after 7pm</h1>
-  <span id="status" class="time" style="color:#fff"></span>
-  <button id="reload">Reload</button>
+  <div class="header-title-group">
+    <span class="material-symbols-outlined app-icon">sports_tennis</span>
+    <div class="header-text">
+      <h1>CourtReserve Watcher</h1>
+      <span id="status" class="last-updated">Checking updates...</span>
+    </div>
+  </div>
+  <button id="reload" class="icon-btn" title="Reload data" aria-label="Reload data">
+    <span class="material-symbols-outlined">refresh</span>
+  </button>
 </header>
-<main id="app">Loading…</main>
+
+<main id="app">
+  <div style="text-align:center; padding: 40px; color: var(--md-on-surface-variant);">
+    Loading events data...
+  </div>
+</main>
+
 <script>
 // Served from the CloudFront stack, state.json is same-origin. Override with ?src=<url> or set DATA_URL for other hosting.
 const DATA_URL = 'https://d22bq7zsasshul.cloudfront.net/courtreserve-watcher/state.json';
 const src = new URLSearchParams(location.search).get('src') || DATA_URL || (location.protocol.startsWith('http') ? 'courtreserve-watcher/state.json' : '');
 
-const ICON = { joined: '➕', left: '➖', 'waitlist-joined': '⏳', 'waitlist-left': '🚪', promoted: '⬆️', demoted: '⬇️', removed: '🗑️' };
-const TEXT = { joined: 'joined', left: 'left', 'waitlist-joined': 'joined the waitlist', 'waitlist-left': 'left the waitlist',
-  promoted: 'moved from waitlist to registered', demoted: 'moved from registered to waitlist', removed: 'event no longer listed' };
+const ICON = { 
+  joined: 'add_circle', 
+  left: 'remove_circle', 
+  'waitlist-joined': 'hourglass_top', 
+  'waitlist-left': 'door_back', 
+  promoted: 'arrow_upward', 
+  demoted: 'arrow_downward', 
+  removed: 'delete' 
+};
+
+const TEXT = { 
+  joined: 'joined', 
+  left: 'left', 
+  'waitlist-joined': 'joined the waitlist', 
+  'waitlist-left': 'left the waitlist',
+  promoted: 'moved from waitlist to registered', 
+  demoted: 'moved from registered to waitlist', 
+  removed: 'event no longer listed' 
+};
+
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const cls = (t) => (t === 'joined' || t === 'promoted' ? 'j' : t === 'left' || t === 'removed' ? 'l' : 'w');
 const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`; };
@@ -49,40 +396,109 @@ function render(d) {
   const last = {};
   log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
   const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
+
   const list = (s, st) => {
     const li = Object.entries(s.people).filter(([, p]) => p.status === st).map(([n]) => n).sort().map((n) => `<li>${esc(n)}</li>`).join('');
-    return li ? `<ol>${li}</ol>` : '<div>—</div>';
+    return li ? `<ol class="people-list">${li}</ol>` : '<div class="empty-state">None</div>';
   };
+
   const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).length;
+
+  const renderIcon = (type) => `<span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle;">${ICON[type] || 'info'}</span>`;
+
   const slots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key)).map((s) => {
     const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
-      `<div class="row"><span class="${cls(l.type)}">${ICON[l.type] || ''} <b>${esc(l.name)}</b> ${esc(TEXT[l.type] || l.type)}</span><div class="time">${new Date(l.ts).toLocaleString()}</div></div>`).join('') || '<div class="time">No changes yet</div>';
+      `<div class="row">
+        <div class="row-main">
+          <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
+          <b>${esc(l.name)}</b>
+        </div>
+        <div class="time">${new Date(l.ts).toLocaleString()}</div>
+      </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
+
     return `<details class="card ${s.key === latest ? 'latest' : ''}" data-key="${esc(s.key)}" ${open.has(s.key) || s.key === latest ? 'open' : ''}>
-      <summary><b>${esc(label(s))}</b> — ${count(s, 'reg')} registered, ${count(s, 'wait')} waitlisted
-      ${s.key === latest ? `<span class="tag">Most recently updated · ${new Date(last[s.key]).toLocaleString()}</span>` : ''}
-      <div class="time">${esc((s.events || []).join(' / '))}</div></summary>
-      <div class="cols"><div><b>Registered</b>${list(s, 'reg')}</div><div><b>Waitlist</b>${list(s, 'wait')}</div><div><b>Joined / left</b>${ch}</div></div></details>`;
-  }).join('') || '<div class="card">No tracked events.</div>';
+      <summary>
+        <div class="summary-header">
+          <span class="summary-title">
+            <span class="material-symbols-outlined" style="color:var(--md-primary)">calendar_today</span>
+            ${esc(label(s))}
+          </span>
+          <span class="material-symbols-outlined expand-icon">expand_more</span>
+        </div>
+        <div class="badges-row">
+          <span class="chip chip-reg">${count(s, 'reg')} registered</span>
+          <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
+          ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">schedule</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
+        </div>
+        <div class="event-subtitle">${esc((s.events || []).join(' / '))}</div>
+      </summary>
+      <div class="card-body">
+        <div class="cols">
+          <div class="col-box">
+            <div class="col-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered</div>
+            ${list(s, 'reg')}
+          </div>
+          <div class="col-box">
+            <div class="col-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist</div>
+            ${list(s, 'wait')}
+          </div>
+          <div class="col-box">
+            <div class="col-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Recent Activity</div>
+            ${ch}
+          </div>
+        </div>
+      </div>
+    </details>`;
+  }).join('') || '<div class="card" style="padding:16px;">No tracked events found.</div>';
+
   const full = log.slice(0, 300).map((l) =>
-    `<div class="row"><span class="${cls(l.type)}">${ICON[l.type] || ''} <b>${esc(l.name)}</b> ${esc(TEXT[l.type] || l.type)}</span>
-     <div class="time">${esc(l.label)} · ${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div></div>`).join('') || '<div class="time">No changes recorded yet.</div>';
-  document.getElementById('app').innerHTML = `<h3>Tracked events</h3>${slots}<h3>Change log</h3><div class="card">${full}</div>`;
-  document.getElementById('status').textContent = d.updated ? `Last checked ${new Date(d.updated).toLocaleString()}` : '';
+    `<div class="row">
+      <div class="row-main">
+        <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
+        <b>${esc(l.name)}</b>
+      </div>
+      <div class="time">${esc(l.label)} · ${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div>
+    </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes recorded yet.</div>';
+
+  document.getElementById('app').innerHTML = `
+    <div class="section-title">Tracked Events</div>
+    ${slots}
+    <div class="section-title">Global Change Log</div>
+    <div class="log-card">${full}</div>
+  `;
+
+  document.getElementById('status').innerHTML = d.updated 
+    ? `<span class="material-symbols-outlined" style="font-size:12px">check_circle</span> Updated ${new Date(d.updated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` 
+    : '';
 }
 
 async function load() {
+  const reloadBtn = document.getElementById('reload');
+  reloadBtn.classList.add('spinning');
   const app = document.getElementById('app');
-  if (!src) { app.innerHTML = '<div class="card err">Set DATA_URL in this file or open with ?src=&lt;url to state.json&gt;</div>'; return; }
+  
+  if (!src) { 
+    app.innerHTML = '<div class="err">Set DATA_URL in this file or open with ?src=&lt;url to state.json&gt;</div>'; 
+    reloadBtn.classList.remove('spinning');
+    return; 
+  }
+  
   try {
     const r = await fetch(`${src}${src.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     render(await r.json());
-  } catch (e) { app.innerHTML = `<div class="card err">Failed to load data: ${esc(e.message)} (check bucket CORS / URL)</div>`; }
+  } catch (e) { 
+    app.innerHTML = `<div class="err">Failed to load data: ${esc(e.message)} (check bucket CORS / URL)</div>`; 
+  } finally {
+    reloadBtn.classList.remove('spinning');
+  }
 }
+
 document.getElementById('app').addEventListener('toggle', (e) => {
   const k = e.target.dataset && e.target.dataset.key; if (!k) return;
   e.target.open ? open.add(k) : open.delete(k);
 }, true);
+
 document.getElementById('reload').onclick = load;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
 setInterval(load, 60000);
