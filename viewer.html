@@ -45,7 +45,6 @@
     padding-bottom: 24px;
   }
 
-  /* App Bar Header */
   header {
     background: var(--md-surface);
     color: var(--md-on-surface);
@@ -102,7 +101,38 @@
     gap: 4px;
   }
 
-  /* Icon Button */
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .header-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #e3f2fd;
+    color: var(--md-primary);
+    border: 1px solid #bbdefb;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+
+  .header-btn:hover {
+    background: #bbdefb;
+    color: var(--md-primary-variant);
+  }
+
+  .header-btn .material-symbols-outlined {
+    font-size: 18px;
+  }
+
   .icon-btn {
     background: transparent;
     border: none;
@@ -127,7 +157,7 @@
   @keyframes spin { 100% { transform: rotate(360deg); } }
 
   main {
-    max-width: 900px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 16px;
   }
@@ -138,10 +168,25 @@
     text-transform: uppercase;
     letter-spacing: 0.8px;
     color: var(--md-on-surface-variant);
-    margin: 20px 0 10px 4px;
+    margin: 24px 0 12px 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
-  /* Material Card & Details */
+  .date-group-header {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--md-primary);
+    background: #e3f2fd;
+    padding: 6px 12px;
+    border-radius: 8px;
+    margin: 20px 0 8px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
   details.card {
     background: var(--md-surface);
     border-radius: var(--radius-card);
@@ -220,34 +265,35 @@
   .chip-reg { background: #e3f2fd; color: #1565c0; }
   .chip-wait { background: #fff3e0; color: #e65100; }
   .chip-latest { background: #fff8e1; color: #b78103; border: 1px solid #ffe082; font-weight: 700; }
+  .chip-relative { background: #f3e5f5; color: #7b1fa2; font-weight: 600; }
 
   .event-subtitle {
     font-size: 0.8rem;
     color: var(--md-on-surface-variant);
   }
 
-  /* Card Content */
   .card-body {
     padding: 0 16px 16px 16px;
     border-top: 1px solid var(--md-outline);
     background: #fafafa;
   }
 
-  .cols {
+  /* 4-column layout for desktop browsers */
+  .event-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: 2fr 1fr 1.2fr;
     gap: 16px;
     margin-top: 16px;
   }
 
-  .col-box {
+  .box-container {
     background: var(--md-surface);
     border: 1px solid var(--md-outline);
     border-radius: 12px;
     padding: 12px;
   }
 
-  .col-title {
+  .box-title {
     font-size: 0.8rem;
     font-weight: 700;
     color: var(--md-on-surface-variant);
@@ -257,6 +303,13 @@
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+
+  /* Two inner columns specifically for registered roster */
+  .roster-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
   }
 
   ol.people-list {
@@ -275,7 +328,6 @@
     font-style: italic;
   }
 
-  /* Activity Feed / Log Row */
   .log-card {
     background: var(--md-surface);
     border-radius: var(--radius-card);
@@ -285,7 +337,7 @@
   }
 
   .row {
-    padding: 10px 0;
+    padding: 8px 0;
     border-bottom: 1px solid #f0f0f0;
     display: flex;
     flex-direction: column;
@@ -298,7 +350,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 0.875rem;
+    font-size: 0.85rem;
   }
 
   .action-chip {
@@ -308,6 +360,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    font-size: 0.8rem;
   }
 
   .j { background: var(--bg-join); color: var(--color-join); }
@@ -327,15 +380,692 @@
     font-weight: 500;
   }
 
-  /* Responsive Design for Mobile */
-  @media (max-width: 768px) {
+  /* Navigation Toolbar */
+  .nav-toolbar {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    padding: 10px 16px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-1);
+    border: 1px solid var(--md-outline);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .view-segmented-btn {
+    display: inline-flex;
+    background: #f1f3f4;
+    padding: 3px;
+    border-radius: 24px;
+    border: 1px solid var(--md-outline);
+  }
+
+  .seg-btn {
+    border: none;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--md-on-surface-variant);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+  }
+
+  .seg-btn:hover {
+    color: var(--md-on-surface);
+  }
+
+  .seg-btn.active {
+    background: var(--md-surface);
+    color: var(--md-primary);
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+  }
+
+  .date-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .date-display-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--md-on-surface);
+    min-width: 170px;
+    text-align: center;
+  }
+
+  .nav-btn {
+    border: 1px solid var(--md-outline);
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background 0.15s;
+  }
+  .nav-btn:hover { background: #f5f5f5; }
+  .nav-btn:active { background: #eeeeee; }
+  .nav-btn-icon {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+  }
+
+  /* Weekly Calendar Grid */
+  .calendar-week-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .calendar-week-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(210px, 1fr));
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .week-day-col {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--md-outline);
+    display: flex;
+    flex-direction: column;
+    min-height: 520px;
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+  }
+
+  .week-day-col.is-today {
+    border: 2px solid var(--md-primary);
+  }
+
+  .week-col-header {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--md-outline);
+    background: #fafafa;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    user-select: none;
+  }
+
+  .week-col-header:hover {
+    background: #f0f4f8;
+  }
+
+  .week-day-col.is-today .week-col-header {
+    background: #e3f2fd;
+  }
+
+  .week-day-name {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--md-on-surface-variant);
+  }
+
+  .week-day-col.is-today .week-day-name {
+    color: var(--md-primary);
+  }
+
+  .week-day-num {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--md-on-surface);
+    line-height: 1.1;
+  }
+
+  .week-day-col.is-today .week-day-num {
+    color: var(--md-primary);
+  }
+
+  .week-col-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: #e8eaf6;
+    color: #283593;
+    margin-top: 2px;
+  }
+
+  .week-col-content {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex-grow: 1;
+    background: #fbfbfb;
+  }
+
+  .cal-event-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+
+  .cal-event-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-2);
+    border-color: #90caf9;
+  }
+
+  .cal-event-card.latest-card {
+    border-left: 4px solid #ffa726;
+  }
+
+  .cal-event-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .cal-event-time-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+  }
+
+  .cal-event-time {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--md-primary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .cal-event-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    line-height: 1.25;
+  }
+
+  .cal-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 2px;
+  }
+
+  .cal-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .cal-badge-reg { background: #e3f2fd; color: #1565c0; }
+  .cal-badge-wait { background: #fff3e0; color: #e65100; }
+  .cal-badge-latest { background: #fff8e1; color: #b78103; border: 1px solid #ffe082; }
+
+  .cal-roster-section {
+    background: #fafafa;
+    border: 1px solid #eeeeee;
+    border-radius: 8px;
+    padding: 8px;
+  }
+
+  .cal-roster-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--md-on-surface-variant);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .cal-roster-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.78rem;
+    max-height: 150px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  .cal-roster-list li {
+    padding: 1px 0;
+    color: var(--md-on-surface);
+    word-break: break-word;
+  }
+
+  .cal-roster-list.waitlist-list li {
+    color: #e65100;
+  }
+
+  .cal-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.72rem;
+    color: var(--md-primary);
+    font-weight: 500;
+    padding-top: 4px;
+    border-top: 1px dashed #e0e0e0;
+  }
+
+  .cal-empty-col {
+    color: #9e9e9e;
+    font-size: 0.8rem;
+    font-style: italic;
+    text-align: center;
+    padding: 40px 8px;
+  }
+
+  /* Day View */
+  .day-view-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .day-ribbon {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    background: var(--md-surface);
+    padding: 8px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--md-outline);
+    box-shadow: var(--shadow-1);
+    overflow-x: auto;
+  }
+
+  .day-ribbon-btn {
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 10px;
+    padding: 8px 4px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: all 0.15s;
+    min-width: 48px;
+  }
+
+  .day-ribbon-btn:hover {
+    background: #f0f4f8;
+  }
+
+  .day-ribbon-btn.active {
+    background: #e3f2fd;
+    border-color: #90caf9;
+  }
+
+  .ribbon-day-name {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--md-on-surface-variant);
+  }
+
+  .day-ribbon-btn.active .ribbon-day-name {
+    color: var(--md-primary);
+  }
+
+  .ribbon-day-val {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--md-on-surface);
+  }
+
+  .day-ribbon-btn.active .ribbon-day-val {
+    color: var(--md-primary);
+  }
+
+  .ribbon-event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--md-primary);
+    margin-top: 2px;
+  }
+
+  .day-header-card {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--md-outline);
+    box-shadow: var(--shadow-1);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .day-header-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin: 0;
+    color: var(--md-on-surface);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .day-slot-card {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    border: 1px solid var(--md-outline);
+    box-shadow: var(--shadow-1);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+
+  .day-slot-header {
+    padding: 16px;
+    background: #fafafa;
+    border-bottom: 1px solid var(--md-outline);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .day-slot-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .day-slot-time {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--md-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .day-slot-events {
+    font-size: 0.85rem;
+    color: var(--md-on-surface-variant);
+  }
+
+  .day-slot-body {
+    padding: 16px;
+  }
+
+  /* Modal Pop-up */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+
+  .modal-overlay.open {
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .modal-window {
+    background: var(--md-surface);
+    border-radius: var(--radius-card);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 820px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: scale(0.96);
+    transition: transform 0.2s ease;
+  }
+
+  .modal-overlay.open .modal-window {
+    transform: scale(1);
+  }
+
+  .modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--md-outline);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    background: #ffffff;
+  }
+
+  .modal-title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .modal-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--md-on-surface);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .modal-subtitle {
+    font-size: 0.85rem;
+    color: var(--md-on-surface-variant);
+  }
+
+  .modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .modal-close-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--md-on-surface-variant);
+    transition: background 0.15s;
+  }
+
+  .modal-close-btn:hover {
+    background: #eeeeee;
+    color: var(--md-on-surface);
+  }
+
+  .modal-summary-bar {
+    padding: 10px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid var(--md-outline);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .modal-tab-nav {
+    display: flex;
+    border-bottom: 1px solid var(--md-outline);
+    background: #f8f9fa;
+    padding: 0 16px;
+    gap: 8px;
+  }
+
+  .modal-tab-btn {
+    background: transparent;
+    border: none;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--md-on-surface-variant);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+
+  .modal-tab-btn:hover {
+    color: var(--md-on-surface);
+  }
+
+  .modal-tab-btn.active {
+    color: var(--md-primary);
+    border-bottom-color: var(--md-primary);
+    font-weight: 700;
+  }
+
+  .tab-count-badge {
+    background: #e0e0e0;
+    color: #424242;
+    font-size: 0.72rem;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+
+  .modal-tab-btn.active .tab-count-badge {
+    background: #bbdefb;
+    color: #1565c0;
+  }
+
+  .modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    max-height: calc(90vh - 180px);
+  }
+
+  .modal-roster-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .search-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+
+  .search-wrap .material-symbols-outlined {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: #9e9e9e;
+  }
+
+  .search-input-box {
+    width: 100%;
+    padding: 8px 12px 8px 36px;
+    border: 1px solid var(--md-outline);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-input-box:focus {
+    border-color: var(--md-primary);
+  }
+
+  /* Responsive Adjustments for Mobile & Tablets */
+  @media (max-width: 992px) {
+    .event-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 600px) {
     header { padding: 10px 12px; }
     main { padding: 12px 8px; }
-    .cols { grid-template-columns: 1fr; gap: 10px; }
+    .roster-2col { grid-template-columns: 1fr; gap: 0; }
     summary { padding: 12px; }
     .card-body { padding: 0 12px 12px 12px; }
     .header-title-group { gap: 8px; }
     header h1 { font-size: 0.95rem; }
+    .header-btn .btn-label { display: none; }
+    .header-btn {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border-radius: 50%;
+      justify-content: center;
+      background: transparent;
+      border: none;
+    }
+    .header-btn:hover { background: rgba(25, 118, 210, 0.08); }
+    .header-btn:active { background: rgba(25, 118, 210, 0.2); }
+    .header-btn .material-symbols-outlined { font-size: 24px; }
+    .nav-toolbar { padding: 8px 12px; gap: 10px; }
+    .date-nav-controls { width: 100%; justify-content: space-between; }
+    .date-display-title { font-size: 0.85rem; min-width: unset; }
+    .seg-btn { padding: 5px 10px; font-size: 0.78rem; }
+    .modal-roster-grid { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -349,9 +1079,15 @@
       <span id="status" class="last-updated">Checking updates...</span>
     </div>
   </div>
-  <button id="reload" class="icon-btn" title="Reload data" aria-label="Reload data">
-    <span class="material-symbols-outlined">refresh</span>
-  </button>
+  <div class="header-actions">
+    <a href="https://app.courtreserve.com/Online/Calendar/Events/17397/Day" target="_blank" rel="noopener noreferrer" class="header-btn" title="Open CourtReserve" aria-label="Open CourtReserve">
+      <span class="material-symbols-outlined">open_in_new</span>
+      <span class="btn-label">CourtReserve</span>
+    </a>
+    <button id="reload" class="icon-btn" title="Reload data" aria-label="Reload data">
+      <span class="material-symbols-outlined">refresh</span>
+    </button>
+  </div>
 </header>
 
 <main id="app">
@@ -360,8 +1096,68 @@
   </div>
 </main>
 
+<!-- Event Details & Activity Modal Pop-up -->
+<div id="eventModal" class="modal-overlay" onclick="handleBackdropClick(event)" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="modal-window">
+    <div class="modal-header">
+      <div class="modal-title-group">
+        <h2 class="modal-title" id="modalTitle">Event Details</h2>
+        <div class="modal-subtitle" id="modalSubtitle">Date & Time</div>
+      </div>
+      <div class="modal-header-actions">
+        <a id="modalCrLink" href="https://app.courtreserve.com/Online/Calendar/Events/17397/Day" target="_blank" rel="noopener noreferrer" class="header-btn" title="Open in CourtReserve">
+          <span class="material-symbols-outlined">open_in_new</span>
+          <span class="btn-label">CourtReserve</span>
+        </a>
+        <button class="modal-close-btn" onclick="closeSlotModal()" aria-label="Close dialog">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="modal-summary-bar" id="modalBadges"></div>
+
+    <div class="modal-tab-nav">
+      <button id="modalTabBtnActivity" class="modal-tab-btn active" onclick="setModalTab('activity')">
+        <span class="material-symbols-outlined">history</span> Activity History <span class="tab-count-badge" id="modalActivityBadge">0</span>
+      </button>
+      <button id="modalTabBtnRoster" class="modal-tab-btn" onclick="setModalTab('roster')">
+        <span class="material-symbols-outlined">group</span> Participants Roster <span class="tab-count-badge" id="modalRosterBadge">0</span>
+      </button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Activity Tab Content -->
+      <div id="modalTabActivity">
+        <div id="modalActivityList"></div>
+      </div>
+
+      <!-- Roster Tab Content -->
+      <div id="modalTabRoster" style="display: none;">
+        <div class="search-wrap">
+          <span class="material-symbols-outlined">search</span>
+          <input type="text" id="modalSearchInput" class="search-input-box" placeholder="Search participants..." oninput="filterModalRoster(this.value)">
+        </div>
+        <div class="modal-roster-grid">
+          <div class="box-container">
+            <div class="box-title" id="modalRegTitle">
+              <span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered
+            </div>
+            <div id="modalRegList"></div>
+          </div>
+          <div class="box-container">
+            <div class="box-title" id="modalWaitTitle">
+              <span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist
+            </div>
+            <div id="modalWaitList"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-// Served from the CloudFront stack, state.json is same-origin. Override with ?src=<url> or set DATA_URL for other hosting.
 const DATA_URL = 'https://d22bq7zsasshul.cloudfront.net/courtreserve-watcher/state.json';
 const src = new URLSearchParams(location.search).get('src') || DATA_URL || (location.protocol.startsWith('http') ? 'courtreserve-watcher/state.json' : '');
 
@@ -388,25 +1184,479 @@ const TEXT = {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const cls = (t) => (t === 'joined' || t === 'promoted' ? 'j' : t === 'left' || t === 'removed' ? 'l' : 'w');
 const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')}${h >= 12 ? 'pm' : 'am'}`; };
-const label = (s) => `${new Date(`${s.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })} ${fmtTime(s.time)}`;
-const open = new Set();
+const renderIcon = (type) => `<span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle;">${ICON[type] || 'info'}</span>`;
+const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).length;
 
-function render(d) {
+const open = new Set();
+let currentData = null;
+let currentView = localStorage.getItem('crw_view') || 'week';
+let selectedDate = new Date();
+let activeModalSlotKey = null;
+let currentModalTab = 'activity';
+let dateInitialized = false;
+
+function toDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getWeekDays(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + diff);
+  
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const cur = new Date(monday);
+    cur.setDate(monday.getDate() + i);
+    days.push(cur);
+  }
+  return days;
+}
+
+function formatWeekRange(weekDays) {
+  const start = weekDays[0];
+  const end = weekDays[6];
+  if (start.getFullYear() === end.getFullYear()) {
+    if (start.getMonth() === end.getMonth()) {
+      return `${start.toLocaleDateString(undefined, { month: 'short' })} ${start.getDate()} – ${end.getDate()}, ${start.getFullYear()}`;
+    }
+    return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${end.getFullYear()}`;
+  }
+  return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+}
+
+function getRelativeDateLabel(dateStr) {
+  const now = new Date();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const slotDate = new Date(y, m - 1, d);
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  const diffTime = slotDate - todayDate;
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays > 1 && diffDays < 7) return `In ${diffDays} days`;
+  if (diffDays >= 7 && diffDays < 14) return 'In 1 week';
+  if (diffDays >= 14) {
+    const weeks = Math.round(diffDays / 7);
+    return `In ${weeks} weeks`;
+  }
+  if (diffDays === -1) return 'Yesterday';
+  return `${Math.abs(diffDays)} days ago`;
+}
+
+function initDateIfNeeded(data) {
+  if (dateInitialized || !data || !data.snapshots) return;
+  dateInitialized = true;
+  const slotKeys = Object.keys(data.snapshots).sort();
+  if (!slotKeys.length) return;
+
+  const weekDays = getWeekDays(selectedDate);
+  const weekDateStrs = new Set(weekDays.map(toDateStr));
+  const hasInWeek = slotKeys.some((k) => weekDateStrs.has(data.snapshots[k].date));
+
+  if (!hasInWeek) {
+    const todayStr = toDateStr(new Date());
+    const upcoming = slotKeys.find((k) => data.snapshots[k].date >= todayStr) || slotKeys[0];
+    if (upcoming && data.snapshots[upcoming]) {
+      const [y, m, d] = data.snapshots[upcoming].date.split('-').map(Number);
+      selectedDate = new Date(y, m - 1, d);
+    }
+  }
+}
+
+function setView(view) {
+  currentView = view;
+  localStorage.setItem('crw_view', view);
+  renderCurrentView();
+}
+
+function navToday() {
+  selectedDate = new Date();
+  renderCurrentView();
+}
+
+function navPrev() {
+  if (currentView === 'day') {
+    selectedDate.setDate(selectedDate.getDate() - 1);
+  } else {
+    selectedDate.setDate(selectedDate.getDate() - 7);
+  }
+  renderCurrentView();
+}
+
+function navNext() {
+  if (currentView === 'day') {
+    selectedDate.setDate(selectedDate.getDate() + 1);
+  } else {
+    selectedDate.setDate(selectedDate.getDate() + 7);
+  }
+  renderCurrentView();
+}
+
+function selectDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  selectedDate = new Date(y, m - 1, d);
+  currentView = 'day';
+  localStorage.setItem('crw_view', 'day');
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  if (!currentData) return;
+  const app = document.getElementById('app');
+
+  let titleStr = '';
+  const weekDays = getWeekDays(selectedDate);
+  if (currentView === 'week') {
+    titleStr = formatWeekRange(weekDays);
+  } else if (currentView === 'day') {
+    titleStr = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  } else {
+    titleStr = 'All Tracked Events';
+  }
+
+  let viewHtml = '';
+  if (currentView === 'week') {
+    viewHtml = renderWeekView(currentData);
+  } else if (currentView === 'day') {
+    viewHtml = renderDayView(currentData);
+  } else {
+    viewHtml = renderListView(currentData);
+  }
+
+  app.innerHTML = `
+    <div class="nav-toolbar">
+      <div class="view-segmented-btn">
+        <button id="seg-week" class="seg-btn ${currentView === 'week' ? 'active' : ''}" onclick="setView('week')">
+          <span class="material-symbols-outlined" style="font-size:18px;">calendar_view_week</span>
+          <span class="seg-label">Week</span>
+        </button>
+        <button id="seg-day" class="seg-btn ${currentView === 'day' ? 'active' : ''}" onclick="setView('day')">
+          <span class="material-symbols-outlined" style="font-size:18px;">calendar_view_day</span>
+          <span class="seg-label">Day</span>
+        </button>
+        <button id="seg-list" class="seg-btn ${currentView === 'list' ? 'active' : ''}" onclick="setView('list')">
+          <span class="material-symbols-outlined" style="font-size:18px;">format_list_bulleted</span>
+          <span class="seg-label">List</span>
+        </button>
+      </div>
+
+      <div class="date-nav-controls" id="dateNavControls" style="${currentView === 'list' ? 'display:none;' : ''}">
+        <button class="nav-btn nav-btn-icon" onclick="navPrev()" title="Previous period" aria-label="Previous period">
+          <span class="material-symbols-outlined" style="font-size:20px;">chevron_left</span>
+        </button>
+        <button class="nav-btn" onclick="navToday()">
+          <span class="material-symbols-outlined" style="font-size:16px;">today</span>
+          Today
+        </button>
+        <button class="nav-btn nav-btn-icon" onclick="navNext()" title="Next period" aria-label="Next period">
+          <span class="material-symbols-outlined" style="font-size:20px;">chevron_right</span>
+        </button>
+        <span class="date-display-title" id="dateDisplayTitle">${titleStr}</span>
+      </div>
+    </div>
+
+    <div id="viewContainer">
+      ${viewHtml}
+    </div>
+  `;
+
+  if (activeModalSlotKey) {
+    updateModalContent(activeModalSlotKey);
+  }
+}
+
+function renderWeekView(d) {
+  const weekDays = getWeekDays(selectedDate);
+  const todayStr = toDateStr(new Date());
+
+  const slotsByDate = {};
+  for (const s of Object.values(d.snapshots)) {
+    if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
+    slotsByDate[s.date].push(s);
+  }
+
   const log = (d.log || []).filter((l) => l.type !== 'tracking');
   const last = {};
   log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
   const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
 
-  const list = (s, st) => {
-    const li = Object.entries(s.people).filter(([, p]) => p.status === st).map(([n]) => n).sort().map((n) => `<li>${esc(n)}</li>`).join('');
-    return li ? `<ol class="people-list">${li}</ol>` : '<div class="empty-state">None</div>';
+  const colsHtml = weekDays.map((day) => {
+    const dateStr = toDateStr(day);
+    const isToday = dateStr === todayStr;
+    const daySlots = (slotsByDate[dateStr] || []).sort((a, b) => a.time.localeCompare(b.time));
+    const dayName = day.toLocaleDateString(undefined, { weekday: 'short' });
+    const dayNum = day.getDate();
+
+    let contentHtml = '';
+    if (!daySlots.length) {
+      contentHtml = `<div class="cal-empty-col">No events</div>`;
+    } else {
+      contentHtml = daySlots.map((s) => {
+        const isLatest = s.key === latest;
+        const regNames = Object.entries(s.people)
+          .filter(([, p]) => p.status === 'reg')
+          .map(([n]) => n)
+          .sort((a, b) => a.localeCompare(b));
+        const waitNames = Object.entries(s.people)
+          .filter(([, p]) => p.status === 'wait')
+          .map(([n]) => n)
+          .sort((a, b) => a.localeCompare(b));
+
+        return `
+          <div class="cal-event-card ${isLatest ? 'latest-card' : ''}" onclick="openSlotModal('${esc(s.key)}')" title="Click for event details & activity log">
+            <div class="cal-event-header">
+              <div class="cal-event-time-row">
+                <span class="cal-event-time">
+                  <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>
+                  ${fmtTime(s.time)}
+                </span>
+                ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
+              </div>
+              <div class="cal-event-title">${esc((s.events || []).join(' / '))}</div>
+              <div class="cal-badges-row">
+                <span class="cal-badge cal-badge-reg"><span class="material-symbols-outlined" style="font-size:12px">group</span> ${regNames.length} reg</span>
+                <span class="cal-badge cal-badge-wait"><span class="material-symbols-outlined" style="font-size:12px">hourglass_empty</span> ${waitNames.length} wait</span>
+              </div>
+            </div>
+
+            <!-- Participant & Waitlist Roster Preview -->
+            <div class="cal-roster-section" onclick="event.stopPropagation(); openSlotModal('${esc(s.key)}')">
+              <div class="cal-roster-title">
+                <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">group</span> Registered (${regNames.length})</span>
+              </div>
+              ${regNames.length 
+                ? `<ol class="cal-roster-list">${regNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+                : `<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">None</div>`
+              }
+
+              ${waitNames.length ? `
+                <div class="cal-roster-title" style="margin-top:8px;">
+                  <span><span class="material-symbols-outlined" style="font-size:13px; color:#ed6c02; vertical-align:middle;">hourglass_empty</span> Waitlist (${waitNames.length})</span>
+                </div>
+                <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
+              ` : ''}
+            </div>
+
+            <div class="cal-card-footer">
+              <span>View details & activity</span>
+              <span class="material-symbols-outlined" style="font-size:14px">arrow_forward</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    return `
+      <div class="week-day-col ${isToday ? 'is-today' : ''}">
+        <div class="week-col-header" onclick="selectDay('${dateStr}')" title="Click to view full day details">
+          <span class="week-day-name">${dayName}</span>
+          <span class="week-day-num">${dayNum}</span>
+          ${isToday ? `<span class="chip chip-reg" style="font-size:0.65rem; padding:1px 6px;">Today</span>` : ''}
+          ${daySlots.length ? `<span class="week-col-badge">${daySlots.length} ${daySlots.length === 1 ? 'event' : 'events'}</span>` : ''}
+        </div>
+        <div class="week-col-content">
+          ${contentHtml}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="calendar-week-container">
+      <div class="calendar-week-grid">
+        ${colsHtml}
+      </div>
+    </div>
+  `;
+}
+
+function renderDayView(d) {
+  const weekDays = getWeekDays(selectedDate);
+  const selectedDateStr = toDateStr(selectedDate);
+  const todayStr = toDateStr(new Date());
+
+  const slotsByDate = {};
+  for (const s of Object.values(d.snapshots)) {
+    if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
+    slotsByDate[s.date].push(s);
+  }
+
+  const ribbonHtml = weekDays.map((day) => {
+    const dStr = toDateStr(day);
+    const isActive = dStr === selectedDateStr;
+    const isToday = dStr === todayStr;
+    const hasSlots = (slotsByDate[dStr] || []).length > 0;
+    const dName = day.toLocaleDateString(undefined, { weekday: 'short' });
+    const dNum = day.getDate();
+
+    return `
+      <button class="day-ribbon-btn ${isActive ? 'active' : ''} ${isToday ? 'is-today' : ''}" onclick="selectDay('${dStr}')" title="${dName}, ${dStr}">
+        <span class="ribbon-day-name">${dName}</span>
+        <span class="ribbon-day-val">${dNum}</span>
+        ${hasSlots ? `<div class="ribbon-event-dot"></div>` : `<div style="height:6px; margin-top:2px;"></div>`}
+      </button>
+    `;
+  }).join('');
+
+  const daySlots = (slotsByDate[selectedDateStr] || []).sort((a, b) => a.time.localeCompare(b.time));
+  const fullDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const relLabel = getRelativeDateLabel(selectedDateStr);
+
+  let slotsHtml = '';
+  if (!daySlots.length) {
+    slotsHtml = `
+      <div class="box-container" style="text-align:center; padding:48px 16px; margin-top:12px;">
+        <span class="material-symbols-outlined" style="font-size:48px; color:#bdbdbd; margin-bottom:8px;">event_busy</span>
+        <h3 style="margin:0 0 6px 0; color:var(--md-on-surface);">No events scheduled for this day</h3>
+        <p style="color:var(--md-on-surface-variant); font-size:0.875rem; margin:0 0 16px 0;">Use the ribbon above or arrows to navigate to dates with events.</p>
+        <button class="nav-btn" onclick="navToday()"><span class="material-symbols-outlined" style="font-size:16px;">today</span> Go to Today</button>
+      </div>
+    `;
+  } else {
+    slotsHtml = daySlots.map((s) => {
+      const regNames = Object.entries(s.people)
+        .filter(([, p]) => p.status === 'reg')
+        .map(([n]) => n)
+        .sort((a, b) => a.localeCompare(b));
+      const waitNames = Object.entries(s.people)
+        .filter(([, p]) => p.status === 'wait')
+        .map(([n]) => n)
+        .sort((a, b) => a.localeCompare(b));
+
+      const half = Math.ceil(regNames.length / 2);
+      const col1 = regNames.slice(0, half);
+      const col2 = regNames.slice(half);
+      const makeList = (items, startIdx) => 
+        `<ol class="people-list" start="${startIdx}">` +
+        items.map((n) => `<li>${esc(n)}</li>`).join('') +
+        `</ol>`;
+
+      const regRosterHtml = regNames.length 
+        ? `<div class="roster-2col"><div>${makeList(col1, 1)}</div><div>${col2.length ? makeList(col2, half + 1) : ''}</div></div>`
+        : '<div class="empty-state">No registered participants yet</div>';
+
+      const waitRosterHtml = waitNames.length
+        ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+        : '<div class="empty-state">No one on the waitlist</div>';
+
+      return `
+        <div class="day-slot-card">
+          <div class="day-slot-header">
+            <div class="day-slot-title-group">
+              <span class="day-slot-time">
+                <span class="material-symbols-outlined">schedule</span>
+                ${fmtTime(s.time)}
+              </span>
+              <div class="day-slot-events">${esc((s.events || []).join(' / '))}</div>
+              <div class="badges-row">
+                <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
+                <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
+              </div>
+            </div>
+            <button class="header-btn" onclick="openSlotModal('${esc(s.key)}')">
+              <span class="material-symbols-outlined">history</span>
+              <span class="btn-label">Event Activity & Details</span>
+            </button>
+          </div>
+          <div class="day-slot-body">
+            <div class="event-grid" style="margin-top:0;">
+              <div class="box-container">
+                <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})</div>
+                ${regRosterHtml}
+              </div>
+              <div class="box-container">
+                <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})</div>
+                ${waitRosterHtml}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  return `
+    <div class="day-view-container">
+      <div class="day-ribbon">
+        ${ribbonHtml}
+      </div>
+      <div class="day-header-card">
+        <div>
+          <h2 class="day-header-title">
+            <span class="material-symbols-outlined" style="color:var(--md-primary)">calendar_month</span>
+            ${fullDateLabel}
+          </h2>
+          <span class="chip chip-relative" style="margin-top:4px;"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
+        </div>
+        <div>
+          <span class="chip chip-reg">${daySlots.length} ${daySlots.length === 1 ? 'Event' : 'Events'} Scheduled</span>
+        </div>
+      </div>
+      ${slotsHtml}
+    </div>
+  `;
+}
+
+function renderListView(d) {
+  const log = (d.log || []).filter((l) => l.type !== 'tracking');
+  const last = {};
+  log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
+  const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
+
+  const renderRegRoster = (s) => {
+    const names = Object.entries(s.people)
+      .filter(([, p]) => p.status === 'reg')
+      .map(([n]) => n)
+      .sort((a, b) => a.localeCompare(b));
+
+    if (!names.length) return '<div class="empty-state">None</div>';
+
+    const half = Math.ceil(names.length / 2);
+    const col1 = names.slice(0, half);
+    const col2 = names.slice(half);
+
+    const makeList = (items, startIdx) => 
+      `<ol class="people-list" start="${startIdx}">` +
+      items.map((n) => `<li>${esc(n)}</li>`).join('') +
+      `</ol>`;
+
+    return `
+      <div class="roster-2col">
+        <div>${makeList(col1, 1)}</div>
+        <div>${col2.length ? makeList(col2, half + 1) : ''}</div>
+      </div>
+    `;
   };
 
-  const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).length;
+  const renderWaitlist = (s) => {
+    const names = Object.entries(s.people)
+      .filter(([, p]) => p.status === 'wait')
+      .map(([n]) => n)
+      .sort((a, b) => a.localeCompare(b));
 
-  const renderIcon = (type) => `<span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle;">${ICON[type] || 'info'}</span>`;
+    if (!names.length) return '<div class="empty-state">None</div>';
 
-  const slots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key)).map((s) => {
+    return `<ol class="people-list">` +
+      names.map((n) => `<li>${esc(n)}</li>`).join('') +
+      `</ol>`;
+  };
+
+  const sortedSlots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key));
+  
+  let lastDate = '';
+  const slotsHtml = sortedSlots.map((s) => {
+    const showDateHeader = s.date !== lastDate;
+    lastDate = s.date;
+    const relLabel = getRelativeDateLabel(s.date);
+
     const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
       `<div class="row">
         <div class="row-main">
@@ -416,39 +1666,60 @@ function render(d) {
         <div class="time">${new Date(l.ts).toLocaleString()}</div>
       </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
 
-    return `<details class="card ${s.key === latest ? 'latest' : ''}" data-key="${esc(s.key)}" ${open.has(s.key) || s.key === latest ? 'open' : ''}>
+    const cardHtml = `<details class="card ${s.key === latest ? 'latest' : ''}" data-key="${esc(s.key)}" ${open.has(s.key) || s.key === latest ? 'open' : ''}>
       <summary>
         <div class="summary-header">
           <span class="summary-title">
-            <span class="material-symbols-outlined" style="color:var(--md-primary)">calendar_today</span>
-            ${esc(label(s))}
+            <span class="material-symbols-outlined" style="color:var(--md-primary)">schedule</span>
+            ${fmtTime(s.time)}
           </span>
           <span class="material-symbols-outlined expand-icon">expand_more</span>
         </div>
         <div class="badges-row">
+          <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
           <span class="chip chip-reg">${count(s, 'reg')} registered</span>
           <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
-          ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">schedule</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
+          ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
+          <button class="header-btn" style="padding:3px 10px; font-size:0.75rem; margin-left:auto;" onclick="event.preventDefault(); event.stopPropagation(); openSlotModal('${esc(s.key)}')">
+            <span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> Details & Activity
+          </button>
         </div>
         <div class="event-subtitle">${esc((s.events || []).join(' / '))}</div>
       </summary>
       <div class="card-body">
-        <div class="cols">
-          <div class="col-box">
-            <div class="col-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered</div>
-            ${list(s, 'reg')}
+        <div class="event-grid">
+          <!-- Columns 1 & 2: Registered Roster -->
+          <div class="box-container">
+            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${count(s, 'reg')})</div>
+            ${renderRegRoster(s)}
           </div>
-          <div class="col-box">
-            <div class="col-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist</div>
-            ${list(s, 'wait')}
+          
+          <!-- Column 3: Waitlist -->
+          <div class="box-container">
+            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${count(s, 'wait')})</div>
+            ${renderWaitlist(s)}
           </div>
-          <div class="col-box">
-            <div class="col-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Recent Activity</div>
+          
+          <!-- Column 4: Activity Per Event -->
+          <div class="box-container">
+            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
             ${ch}
           </div>
         </div>
       </div>
     </details>`;
+
+    if (showDateHeader) {
+      const formattedDate = new Date(`${s.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+      return `
+        <div class="date-group-header">
+          <span class="material-symbols-outlined" style="font-size:16px">calendar_month</span>
+          ${formattedDate} (${relLabel})
+        </div>
+        ${cardHtml}
+      `;
+    }
+    return cardHtml;
   }).join('') || '<div class="card" style="padding:16px;">No tracked events found.</div>';
 
   const full = log.slice(0, 300).map((l) =>
@@ -460,12 +1731,143 @@ function render(d) {
       <div class="time">${esc(l.label)} · ${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div>
     </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes recorded yet.</div>';
 
-  document.getElementById('app').innerHTML = `
-    <div class="section-title">Tracked Events</div>
-    ${slots}
-    <div class="section-title">Global Change Log</div>
+  return `
+    <div class="section-title"><span class="material-symbols-outlined">event_upcoming</span> Tracked Events</div>
+    ${slotsHtml}
+    <div class="section-title"><span class="material-symbols-outlined">list_alt</span> Global Change Log</div>
     <div class="log-card">${full}</div>
   `;
+}
+
+function openSlotModal(slotKey) {
+  if (!currentData || !currentData.snapshots || !currentData.snapshots[slotKey]) return;
+  activeModalSlotKey = slotKey;
+  updateModalContent(slotKey);
+  const modal = document.getElementById('eventModal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSlotModal() {
+  activeModalSlotKey = null;
+  const modal = document.getElementById('eventModal');
+  if (modal) {
+    modal.classList.remove('open');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+  document.body.style.overflow = '';
+  const searchInput = document.getElementById('modalSearchInput');
+  if (searchInput) searchInput.value = '';
+}
+
+function setModalTab(tab) {
+  currentModalTab = tab;
+  document.getElementById('modalTabBtnActivity').classList.toggle('active', tab === 'activity');
+  document.getElementById('modalTabBtnRoster').classList.toggle('active', tab === 'roster');
+  document.getElementById('modalTabActivity').style.display = tab === 'activity' ? 'block' : 'none';
+  document.getElementById('modalTabRoster').style.display = tab === 'roster' ? 'block' : 'none';
+}
+
+function updateModalContent(slotKey) {
+  if (!currentData || !currentData.snapshots) return;
+  const s = currentData.snapshots[slotKey];
+  if (!s) return;
+
+  const [y, m, d] = s.date.split('-').map(Number);
+  const slotDate = new Date(y, m - 1, d);
+  const formattedDate = slotDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const relLabel = getRelativeDateLabel(s.date);
+
+  const regNames = Object.entries(s.people)
+    .filter(([, p]) => p.status === 'reg')
+    .map(([n]) => n)
+    .sort((a, b) => a.localeCompare(b));
+  const waitNames = Object.entries(s.people)
+    .filter(([, p]) => p.status === 'wait')
+    .map(([n]) => n)
+    .sort((a, b) => a.localeCompare(b));
+
+  const log = (currentData.log || []).filter((l) => l.slot === slotKey && l.type !== 'tracking');
+
+  document.getElementById('modalTitle').textContent = (s.events || []).join(' / ') || 'CourtReserve Event';
+  document.getElementById('modalSubtitle').innerHTML = `
+    <span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; color:var(--md-primary)">schedule</span>
+    <b>${fmtTime(s.time)}</b> · ${formattedDate} (${relLabel})
+  `;
+
+  document.getElementById('modalBadges').innerHTML = `
+    <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
+    <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
+    <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
+    ${s.updated ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:13px">update</span> Checked ${new Date(s.updated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>` : ''}
+  `;
+
+  document.getElementById('modalActivityBadge').textContent = log.length;
+  document.getElementById('modalRosterBadge').textContent = `${regNames.length + waitNames.length}`;
+
+  const activityHtml = log.length ? log.map((l) => `
+    <div class="row">
+      <div class="row-main">
+        <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
+        <b>${esc(l.name)}</b>
+      </div>
+      <div class="time">${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div>
+    </div>
+  `).join('') : '<div class="empty-state" style="padding:28px 0; text-align:center;">No changes recorded for this event yet.</div>';
+
+  document.getElementById('modalActivityList').innerHTML = activityHtml;
+
+  document.getElementById('modalRegTitle').innerHTML = `
+    <span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})
+  `;
+  document.getElementById('modalRegList').innerHTML = regNames.length
+    ? `<ol class="people-list">${regNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+    : '<div class="empty-state">No registered participants</div>';
+
+  document.getElementById('modalWaitTitle').innerHTML = `
+    <span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})
+  `;
+  document.getElementById('modalWaitList').innerHTML = waitNames.length
+    ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+    : '<div class="empty-state">No one on the waitlist</div>';
+
+  const searchInput = document.getElementById('modalSearchInput');
+  if (searchInput && searchInput.value) {
+    filterModalRoster(searchInput.value);
+  }
+}
+
+function filterModalRoster(query) {
+  const q = (query || '').trim().toLowerCase();
+  const regItems = document.querySelectorAll('#modalRegList li');
+  const waitItems = document.querySelectorAll('#modalWaitList li');
+
+  regItems.forEach((li) => {
+    li.style.display = (!q || li.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+
+  waitItems.forEach((li) => {
+    li.style.display = (!q || li.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+function handleBackdropClick(e) {
+  if (e.target.id === 'eventModal') {
+    closeSlotModal();
+  }
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && activeModalSlotKey) {
+    closeSlotModal();
+  }
+});
+
+function render(d) {
+  currentData = d;
+  initDateIfNeeded(d);
+  renderCurrentView();
 
   document.getElementById('status').innerHTML = d.updated 
     ? `<span class="material-symbols-outlined" style="font-size:12px">check_circle</span> Updated ${new Date(d.updated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` 
