@@ -1,6 +1,8 @@
 // watcher.js
 const fetch = require('node-fetch');
 
+const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
 const CONFIG = {
   orgId: '17397',
   days: [1, 3, 5], // Mon, Wed, Fri
@@ -120,7 +122,11 @@ async function readWeek(startLocal) {
   const body = new URLSearchParams({ jsonData: JSON.stringify(criteria), sort: '', group: '', filter: '' });
   const r = await fetch(`https://app.courtreserve.com/Online/Calendar/ReadCalendarEvents/${CONFIG.orgId}`, {
     method: 'POST', body,
-    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'User-Agent': DEFAULT_UA,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
   });
   if (!r.ok) throw new Error(`calendar HTTP ${r.status}`);
   const j = await r.json();
@@ -128,21 +134,33 @@ async function readWeek(startLocal) {
 }
 
 async function readParticipants(number) {
-  const page = await fetch(`https://app.courtreserve.com/Online/Events/Details/${CONFIG.orgId}/${encodeURIComponent(number)}`);
+  const pageUrl = `https://app.courtreserve.com/Online/Events/Details/${CONFIG.orgId}/${encodeURIComponent(number)}`;
+  const page = await fetch(pageUrl, {
+    headers: { 'User-Agent': DEFAULT_UA }
+  });
   if (!page.ok) throw new Error(`details HTTP ${page.status}`);
   const htmlText = await page.text();
   const m = /fixUrl\('([^']*EventsApi\/ApiDetails[^']*)'\)/.exec(htmlText);
   if (!m) throw new Error('details: ApiDetails url not found');
   
+  const rawCookies = page.headers.raw ? (page.headers.raw()['set-cookie'] || []) : [];
+  const cookies = rawCookies.map((c) => c.split(';')[0]).join('; ');
   const apiUri = new URL(m[1].replace(/&amp;/g, '&'), 'https://app.courtreserve.com');
   apiUri.searchParams.set('modalHtml', '""');
   
-  const r = await fetch(apiUri.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+  const r = await fetch(apiUri.toString(), {
+    headers: {
+      'User-Agent': DEFAULT_UA,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Referer': pageUrl,
+      ...(cookies ? { Cookie: cookies } : {})
+    }
+  });
   if (!r.ok) throw new Error(`ApiDetails HTTP ${r.status}`);
   const detailHtml = await r.text();
   
   const extractNames = (sectionTestId) => {
-    const tableRegex = new RegExp(`data-testid="${sectionTestId}"[\\s\\S]*?<tbody[\\s\\S]*?<\/tbody>`, 'i');
+    const tableRegex = new RegExp(`data-testid="${sectionTestId}"[\\s\\S]*?<\\/tbody>`, 'i');
     const match = tableRegex.exec(detailHtml);
     if (!match) return [];
     const rowRegex = /<th[^>]*scope="row"[^>]*>([\s\S]*?)<\/th>/gi;
@@ -180,7 +198,9 @@ async function main() {
   }
 
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const nyParts = zonedParts(now, 'America/New_York');
+  const [nyY, nyM, nyD] = nyParts.dateStr.split('-').map(Number);
+  const today = new Date(nyY, nyM - 1, nyD);
   const weekStarts = Array.from({ length: CONFIG.weeksAhead }, (_, i) => {
     const d = new Date(today); d.setDate(d.getDate() + 7 * i); return d;
   });
@@ -194,7 +214,12 @@ async function main() {
   const targets = slots.flatMap((s) => s.events.map((e) => ({ slot: s, ev: e })));
   const results = await pool(targets, CONFIG.concurrency, async ({ ev }) => {
     if (!ev.signed && !ev.wait) return { reg: [], wait: [] };
-    try { return await readParticipants(ev.number); } catch (e) { return null; }
+    try {
+      return await readParticipants(ev.number);
+    } catch (e) {
+      console.error(`Failed to read participants for event ${ev.number} (${ev.name}):`, e.message);
+      return null;
+    }
   });
 
   const ts = Date.now();

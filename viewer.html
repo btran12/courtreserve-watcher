@@ -1869,8 +1869,9 @@ function render(d) {
   initDateIfNeeded(d);
   renderCurrentView();
 
-  document.getElementById('status').innerHTML = d.updated 
-    ? `<span class="material-symbols-outlined" style="font-size:12px">check_circle</span> Updated ${new Date(d.updated).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` 
+  const updatedTs = d.updated || d.lastRun || d.uploadedAt;
+  document.getElementById('status').innerHTML = updatedTs 
+    ? `<span class="material-symbols-outlined" style="font-size:12px">check_circle</span> Updated ${new Date(updatedTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` 
     : '';
 }
 
