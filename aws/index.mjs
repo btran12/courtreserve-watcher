@@ -241,7 +241,7 @@ export const handler = async () => {
     } else if (prev) {
       diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
     }
-    snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => e.name), people, updated: ts };
+    snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => ({ name: e.name, number: e.number })), people, updated: ts };
   }
 
   state.snapshots = snapshots;

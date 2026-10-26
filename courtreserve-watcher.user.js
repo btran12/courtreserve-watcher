@@ -21,7 +21,7 @@
     concurrency: 3,
     storageKey: 'crw:v1',
     // Optional: Lambda Function URL that stores the data in S3 (see aws/README.md). Leave url empty to disable.
-    upload: { url: 'https://iadaqxsoltiiozya7osszn545q0bvwre.lambda-url.us-east-1.on.aws/', token: '5f110021d039457da1b6e15d830ccc50a4db18ac0e4c466fa6a83ba4b1f82075', maxLog: 500 },
+    upload: { url: 'YOUR_LAMBDA_URL', token: 'YOUR_UPLOAD_TOKEN', maxLog: 500 },
   };
 
   // ---------- pure helpers ----------
@@ -262,7 +262,7 @@
       } else if (prev) {
         diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
       }
-      snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => e.name), people, updated: ts };
+      snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => ({ name: e.name, number: e.number })), people, updated: ts };
     }
 
     // Drop slots in the past; report vanished upcoming slots only when every week loaded fine.

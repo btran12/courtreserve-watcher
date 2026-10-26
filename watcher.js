@@ -12,8 +12,8 @@ const CONFIG = {
   concurrency: 3,
   stateUrl: 'https://d22bq7zsasshul.cloudfront.net/courtreserve-watcher/state.json',
   upload: { 
-    url: 'https://iadaqxsoltiiozya7osszn545q0bvwre.lambda-url.us-east-1.on.aws/', 
-    token: '5f110021d039457da1b6e15d830ccc50a4db18ac0e4c466fa6a83ba4b1f82075',
+    url: 'YOUR_LAMBDA_URL', 
+    token: 'YOUR_UPLOAD_TOKEN',
     maxLog: 500 
   }
 };
@@ -242,7 +242,7 @@ async function main() {
     } else if (prev) {
       diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
     }
-    snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => e.name), people, updated: ts };
+    snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => ({ name: e.name, number: e.number })), people, updated: ts };
   }
 
   state.snapshots = snapshots;

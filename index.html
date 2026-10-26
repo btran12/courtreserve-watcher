@@ -763,6 +763,27 @@
     margin-top: 2px;
   }
 
+  .day-compact-date {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--md-surface);
+    border-radius: 12px;
+    border: 1px solid var(--md-outline);
+    margin-bottom: 12px;
+  }
+  .day-compact-date .compact-date-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
   .day-header-card {
     background: var(--md-surface);
     border-radius: var(--radius-card);
@@ -1066,6 +1087,239 @@
     .date-display-title { font-size: 0.85rem; min-width: unset; }
     .seg-btn { padding: 5px 10px; font-size: 0.78rem; }
     .modal-roster-grid { grid-template-columns: 1fr; }
+
+    /* ── Mobile Day View simplification ── */
+    .day-compact-date {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--md-surface);
+    border-radius: 12px;
+    border: 1px solid var(--md-outline);
+    margin-bottom: 12px;
+  }
+  .day-compact-date .compact-date-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .day-header-card {
+      padding: 8px 12px;
+      flex-wrap: nowrap;
+      gap: 8px;
+    }
+    .day-header-title {
+      font-size: 1rem;
+    }
+    .day-header-card .chip-relative {
+      font-size: 0.7rem;
+      padding: 2px 6px;
+    }
+    .day-slot-header {
+      padding: 10px 12px;
+      gap: 6px;
+    }
+    .day-slot-time {
+      font-size: 0.95rem;
+    }
+    .day-slot-events {
+      font-size: 0.78rem;
+    }
+    .day-slot-header .header-btn {
+      display: none;
+    }
+    .day-slot-body {
+      padding: 10px 12px;
+    }
+    /* Two-column roster on mobile: registered | waitlist */
+    .day-slot-body .event-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .day-slot-body .box-container {
+      padding: 8px;
+    }
+    .day-slot-body .box-title {
+      font-size: 0.72rem;
+      margin-bottom: 4px;
+    }
+    .day-slot-body .people-list {
+      font-size: 0.92rem;
+      padding-left: 18px;
+    }
+    .day-slot-body .people-list li {
+      padding: 3px 0;
+    }
+    .day-slot-body .empty-state {
+      font-size: 0.8rem;
+    }
+    /* Day ribbon compact */
+    .day-ribbon {
+      gap: 4px;
+      padding: 6px;
+    }
+    .day-ribbon-btn {
+      padding: 6px 2px;
+      min-width: 38px;
+    }
+    .ribbon-day-name {
+      font-size: 0.65rem;
+    }
+    .ribbon-day-val {
+      font-size: 1rem;
+    }
+
+    /* User name input in header */
+    .user-name-wrap {
+      display: inline-flex;
+      align-items: center;
+    }
+    .user-name-input {
+      width: 90px;
+      font-size: 0.78rem;
+    }
+  }
+
+  /* ── User name input ── */
+  .user-name-wrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .user-name-input {
+    border: 1px solid var(--md-outline);
+    border-radius: 16px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    color: var(--md-on-surface);
+    background: var(--md-surface);
+    outline: none;
+    width: 110px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .user-name-input:focus {
+    border-color: var(--md-primary);
+    box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+  }
+  .user-name-input::placeholder {
+    color: #bdbdbd;
+  }
+  .user-name-saved {
+    color: #2e7d32;
+    font-size: 16px;
+  }
+
+  /* ── User highlight in registrant lists ── */
+  .user-match {
+    display: inline-block;
+    font-weight: 700;
+    color: #1565c0;
+    background: #e3f2fd;
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin: 1px -6px;
+  }
+  .user-match-waitlist {
+    display: inline-block;
+    font-weight: 700;
+    color: #e65100;
+    background: #fff3e0;
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin: 1px -6px;
+  }
+
+  /* ── User registration status badge ── */
+  .user-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 12px;
+    margin-top: 4px;
+  }
+  .user-status-badge.registered {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border: 1px solid #a5d6a7;
+  }
+  .user-status-badge.waitlisted {
+    background: #fff3e0;
+    color: #e65100;
+    border: 1px solid #ffcc80;
+  }
+  .user-status-badge.not-registered {
+    background: #f5f5f5;
+    color: #9e9e9e;
+    border: 1px solid #e0e0e0;
+  }
+
+  /* ── Countdown chip for registration window ── */
+  .chip-countdown {
+    background: #e8eaf6;
+    color: #283593;
+    border: 1px solid #c5cae9;
+    font-weight: 600;
+  }
+
+  /* ── Swipe transition ── */
+  .day-view-container {
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .day-view-container.swiping {
+    transition: none;
+  }
+  .day-slots-wrapper {
+    transition: transform 0.25s ease;
+  }
+  .day-slots-wrapper.swipe-return {
+    transition: transform 0.25s ease;
+  }
+
+  /* ── Activity view ── */
+  .activity-view-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .activity-log-row {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    box-shadow: var(--shadow-1);
+  }
+  .activity-log-row .act-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .activity-log-row .act-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .activity-log-row .act-name {
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .activity-log-row .act-meta {
+    font-size: 0.75rem;
+    color: var(--md-on-surface-variant);
+    margin-top: 2px;
   }
 </style>
 </head>
@@ -1080,6 +1334,11 @@
     </div>
   </div>
   <div class="header-actions">
+    <div class="user-name-wrap">
+      <span class="material-symbols-outlined" style="font-size:18px; color:var(--md-on-surface-variant);">person</span>
+      <input type="text" id="userNameInput" class="user-name-input" placeholder="Your name" autocomplete="off" title="Enter your name to see your registration status">
+      <span class="material-symbols-outlined user-name-saved" id="userNameCheck" style="display:none;">check_circle</span>
+    </div>
     <a href="https://app.courtreserve.com/Online/Calendar/Events/17397/Day" target="_blank" rel="noopener noreferrer" class="header-btn" title="Open CourtReserve" aria-label="Open CourtReserve">
       <span class="material-symbols-outlined">open_in_new</span>
       <span class="btn-label">CourtReserve</span>
@@ -1189,11 +1448,87 @@ const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).
 
 const open = new Set();
 let currentData = null;
-let currentView = localStorage.getItem('crw_view') || 'week';
+let currentView = (() => {
+  const saved = localStorage.getItem('crw_view');
+  if (saved) return saved;
+  return window.innerWidth < 768 ? 'day' : 'week';
+})();
 let selectedDate = new Date();
 let activeModalSlotKey = null;
 let currentModalTab = 'activity';
 let dateInitialized = false;
+
+// ── User name ──
+let userName = localStorage.getItem('crw_user_name') || '';
+function setUserName(name) {
+  userName = name.trim();
+  localStorage.setItem('crw_user_name', userName);
+  const input = document.getElementById('userNameInput');
+  const check = document.getElementById('userNameCheck');
+  if (input) input.value = userName;
+  if (check) check.style.display = userName ? '' : 'none';
+  renderCurrentView();
+}
+function userStatus(snapshot) {
+  if (!userName || !snapshot) return null;
+  const key = userName.toLowerCase();
+  for (const [name, p] of Object.entries(snapshot.people)) {
+    if (name.toLowerCase() === key) return p.status;
+  }
+  return null;
+}
+function highlightName(name) {
+  if (!userName) return esc(name);
+  if (name.toLowerCase() === userName.toLowerCase()) return `<span class="user-match">${esc(name)}</span>`;
+  return esc(name);
+}
+function highlightNameWaitlist(name) {
+  if (!userName) return esc(name);
+  if (name.toLowerCase() === userName.toLowerCase()) return `<span class="user-match-waitlist">${esc(name)}</span>`;
+  return esc(name);
+}
+
+// ── Registration window countdown ──
+function getDaysUntilRegOpens(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const eventDate = new Date(y, m - 1, d);
+  const regOpenDate = new Date(eventDate);
+  regOpenDate.setDate(regOpenDate.getDate() - 14);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  regOpenDate.setHours(0, 0, 0, 0);
+  const diffMs = regOpenDate - today;
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+function regCountdownHtml(dateStr) {
+  const days = getDaysUntilRegOpens(dateStr);
+  if (days <= 0) return '';
+  const label = days === 0 ? 'Opens today' : days === 1 ? 'Opens tomorrow' : `Opens in ${days} days`;
+  return `<span class="chip chip-countdown"><span class="material-symbols-outlined" style="font-size:13px;">lock_clock</span> ${label}</span>`;
+}
+
+function userStatusBadgeHtml(status) {
+  if (!userName) return '';
+  if (status === 'reg') return `<span class="user-status-badge registered"><span class="material-symbols-outlined" style="font-size:14px;">check_circle</span> You're registered</span>`;
+  if (status === 'wait') return `<span class="user-status-badge waitlisted"><span class="material-symbols-outlined" style="font-size:14px;">hourglass_empty</span> You're on the waitlist</span>`;
+  return `<span class="user-status-badge not-registered"><span class="material-symbols-outlined" style="font-size:14px;">cancel</span> Not registered</span>`;
+}
+
+function eventUrl(keyOrNumber) {
+  return `https://app.courtreserve.com/Online/Events/Details/17397/${keyOrNumber}`;
+}
+
+// ── Event data helpers (events are now {name, number} objects) ──
+function eventNames(snapshot) {
+  return (snapshot.events || []).map(e => typeof e === 'string' ? e : e.name);
+}
+function firstEventNumber(snapshot) {
+  const evs = snapshot.events || [];
+  if (!evs.length) return snapshot.key;
+  const e = evs[0];
+  return typeof e === 'string' ? snapshot.key : (e.number || snapshot.key);
+}
 
 function toDateStr(d) {
   const y = d.getFullYear();
@@ -1275,6 +1610,8 @@ function setView(view) {
   currentView = view;
   localStorage.setItem('crw_view', view);
   renderCurrentView();
+  // Attach swipe handlers when entering day view
+  if (view === 'day') setTimeout(attachSwipeHandlers, 100);
 }
 
 function navToday() {
@@ -1318,6 +1655,8 @@ function renderCurrentView() {
     titleStr = formatWeekRange(weekDays);
   } else if (currentView === 'day') {
     titleStr = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  } else if (currentView === 'activity') {
+    titleStr = 'All Activity';
   } else {
     titleStr = 'All Tracked Events';
   }
@@ -1327,6 +1666,8 @@ function renderCurrentView() {
     viewHtml = renderWeekView(currentData);
   } else if (currentView === 'day') {
     viewHtml = renderDayView(currentData);
+  } else if (currentView === 'activity') {
+    viewHtml = renderActivityView(currentData);
   } else {
     viewHtml = renderListView(currentData);
   }
@@ -1346,9 +1687,13 @@ function renderCurrentView() {
           <span class="material-symbols-outlined" style="font-size:18px;">format_list_bulleted</span>
           <span class="seg-label">List</span>
         </button>
+        <button id="seg-activity" class="seg-btn ${currentView === 'activity' ? 'active' : ''}" onclick="setView('activity')">
+          <span class="material-symbols-outlined" style="font-size:18px;">history</span>
+          <span class="seg-label">Activity</span>
+        </button>
       </div>
 
-      <div class="date-nav-controls" id="dateNavControls" style="${currentView === 'list' ? 'display:none;' : ''}">
+      <div class="date-nav-controls" id="dateNavControls" style="${currentView === 'list' || currentView === 'activity' ? 'display:none;' : ''}">
         <button class="nav-btn nav-btn-icon" onclick="navPrev()" title="Previous period" aria-label="Previous period">
           <span class="material-symbols-outlined" style="font-size:20px;">chevron_left</span>
         </button>
@@ -1368,7 +1713,8 @@ function renderCurrentView() {
     </div>
   `;
 
-  if (activeModalSlotKey) {
+  if (currentView === 'day') setTimeout(attachSwipeHandlers, 150);
+    if (activeModalSlotKey) {
     updateModalContent(activeModalSlotKey);
   }
 }
@@ -1420,7 +1766,7 @@ function renderWeekView(d) {
                 </span>
                 ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
               </div>
-              <div class="cal-event-title">${esc((s.events || []).join(' / '))}</div>
+              <div class="cal-event-title">${esc(eventNames(s).join(' / '))}</div>
               <div class="cal-badges-row">
                 <span class="cal-badge cal-badge-reg"><span class="material-symbols-outlined" style="font-size:12px">group</span> ${regNames.length} reg</span>
                 <span class="cal-badge cal-badge-wait"><span class="material-symbols-outlined" style="font-size:12px">hourglass_empty</span> ${waitNames.length} wait</span>
@@ -1433,7 +1779,7 @@ function renderWeekView(d) {
                 <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">group</span> Registered (${regNames.length})</span>
               </div>
               ${regNames.length 
-                ? `<ol class="cal-roster-list">${regNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+                ? `<ol class="cal-roster-list">${regNames.map((n) => `<li>${highlightName(n)}</li>`).join('')}</ol>`
                 : `<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">None</div>`
               }
 
@@ -1441,12 +1787,14 @@ function renderWeekView(d) {
                 <div class="cal-roster-title" style="margin-top:8px;">
                   <span><span class="material-symbols-outlined" style="font-size:13px; color:#ed6c02; vertical-align:middle;">hourglass_empty</span> Waitlist (${waitNames.length})</span>
                 </div>
-                <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>
+                <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>
               ` : ''}
             </div>
 
             <div class="cal-card-footer">
-              <span>View details & activity</span>
+              <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:4px;color:var(--md-primary);text-decoration:none;font-weight:600;">
+                <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register
+              </a>
               <span class="material-symbols-outlined" style="font-size:14px">arrow_forward</span>
             </div>
           </div>
@@ -1508,6 +1856,7 @@ function renderDayView(d) {
 
   const daySlots = (slotsByDate[selectedDateStr] || []).sort((a, b) => a.time.localeCompare(b.time));
   const fullDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const slotDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
   const relLabel = getRelativeDateLabel(selectedDateStr);
 
   let slotsHtml = '';
@@ -1534,17 +1883,21 @@ function renderDayView(d) {
       const half = Math.ceil(regNames.length / 2);
       const col1 = regNames.slice(0, half);
       const col2 = regNames.slice(half);
-      const makeList = (items, startIdx) => 
+      const uStatus = userStatus(s);
+      const userBadgeHtml = userStatusBadgeHtml(uStatus);
+      const countdownHtml = regCountdownHtml(s.date);
+
+      const makeList = (items, startIdx, hlFn) => 
         `<ol class="people-list" start="${startIdx}">` +
-        items.map((n) => `<li>${esc(n)}</li>`).join('') +
+        items.map((n) => `<li>${hlFn(n)}</li>`).join('') +
         `</ol>`;
 
       const regRosterHtml = regNames.length 
-        ? `<div class="roster-2col"><div>${makeList(col1, 1)}</div><div>${col2.length ? makeList(col2, half + 1) : ''}</div></div>`
+        ? `<div class="roster-2col"><div>${makeList(col1, 1, highlightName)}</div><div>${col2.length ? makeList(col2, half + 1, highlightName) : ''}</div></div>`
         : '<div class="empty-state">No registered participants yet</div>';
 
       const waitRosterHtml = waitNames.length
-        ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+        ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>`
         : '<div class="empty-state">No one on the waitlist</div>';
 
       return `
@@ -1555,16 +1908,31 @@ function renderDayView(d) {
                 <span class="material-symbols-outlined">schedule</span>
                 ${fmtTime(s.time)}
               </span>
-              <div class="day-slot-events">${esc((s.events || []).join(' / '))}</div>
+              <div class="day-slot-events">${esc(eventNames(s).join(' / '))}</div>
               <div class="badges-row">
                 <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
                 <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
+                ${userBadgeHtml}
+                ${countdownHtml}
               </div>
             </div>
-            <button class="header-btn" onclick="openSlotModal('${esc(s.key)}')">
-              <span class="material-symbols-outlined">history</span>
-              <span class="btn-label">Event Activity & Details</span>
-            </button>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+              <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:4px 10px; font-size:0.75rem; text-decoration:none;" title="Register on CourtReserve">
+                <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span>
+                <span class="btn-label">Register</span>
+              </a>
+              <span style="font-size:0.78rem; font-weight:600; color:var(--md-on-surface); white-space:nowrap;">
+                <span class="material-symbols-outlined" style="font-size:14px; vertical-align:middle; color:var(--md-primary);">calendar_month</span>
+                ${slotDateLabel}
+              </span>
+              <span class="chip chip-relative" style="font-size:0.7rem;">
+                <span class="material-symbols-outlined" style="font-size:12px;">event</span> ${relLabel}
+              </span>
+              <button class="header-btn" onclick="openSlotModal('${esc(s.key)}')" style="margin-top:2px;">
+                <span class="material-symbols-outlined">history</span>
+                <span class="btn-label">Activity</span>
+              </button>
+            </div>
           </div>
           <div class="day-slot-body">
             <div class="event-grid" style="margin-top:0;">
@@ -1587,18 +1955,6 @@ function renderDayView(d) {
     <div class="day-view-container">
       <div class="day-ribbon">
         ${ribbonHtml}
-      </div>
-      <div class="day-header-card">
-        <div>
-          <h2 class="day-header-title">
-            <span class="material-symbols-outlined" style="color:var(--md-primary)">calendar_month</span>
-            ${fullDateLabel}
-          </h2>
-          <span class="chip chip-relative" style="margin-top:4px;"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
-        </div>
-        <div>
-          <span class="chip chip-reg">${daySlots.length} ${daySlots.length === 1 ? 'Event' : 'Events'} Scheduled</span>
-        </div>
       </div>
       ${slotsHtml}
     </div>
@@ -1625,7 +1981,7 @@ function renderListView(d) {
 
     const makeList = (items, startIdx) => 
       `<ol class="people-list" start="${startIdx}">` +
-      items.map((n) => `<li>${esc(n)}</li>`).join('') +
+      items.map((n) => `<li>${highlightName(n)}</li>`).join('') +
       `</ol>`;
 
     return `
@@ -1645,7 +2001,7 @@ function renderListView(d) {
     if (!names.length) return '<div class="empty-state">None</div>';
 
     return `<ol class="people-list">` +
-      names.map((n) => `<li>${esc(n)}</li>`).join('') +
+      names.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('') +
       `</ol>`;
   };
 
@@ -1679,12 +2035,17 @@ function renderListView(d) {
           <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
           <span class="chip chip-reg">${count(s, 'reg')} registered</span>
           <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
+          ${userStatusBadgeHtml(userStatus(s))}
+          ${regCountdownHtml(s.date)}
           ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
+          <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 10px; font-size:0.75rem; text-decoration:none;" title="Register on CourtReserve" onclick="event.stopPropagation();">
+            <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register
+          </a>
           <button class="header-btn" style="padding:3px 10px; font-size:0.75rem; margin-left:auto;" onclick="event.preventDefault(); event.stopPropagation(); openSlotModal('${esc(s.key)}')">
             <span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> Details & Activity
           </button>
         </div>
-        <div class="event-subtitle">${esc((s.events || []).join(' / '))}</div>
+        <div class="event-subtitle">${esc(eventNames(s).join(' / '))}</div>
       </summary>
       <div class="card-body">
         <div class="event-grid">
@@ -1739,6 +2100,36 @@ function renderListView(d) {
   `;
 }
 
+function renderActivityView(d) {
+  const log = (d.log || []).filter((l) => l.type !== 'tracking').slice(0, 200);
+  if (!log.length) {
+    return `<div class="activity-view-container"><div class="box-container" style="text-align:center; padding:48px 16px;">
+      <span class="material-symbols-outlined" style="font-size:48px; color:#bdbdbd; margin-bottom:8px;">history</span>
+      <h3 style="margin:0 0 6px 0; color:var(--md-on-surface);">No activity recorded yet</h3>
+      <p style="color:var(--md-on-surface-variant); font-size:0.875rem; margin:0;">Changes will appear here as the watcher detects them.</p>
+    </div></div>`;
+  }
+
+  const rows = log.map((l) => `
+    <div class="activity-log-row">
+      <span class="act-icon material-symbols-outlined" style="color:${cls(l.type) === 'j' ? '#2e7d32' : cls(l.type) === 'l' ? '#c62828' : '#ed6c02'}; font-size:20px;">
+        ${ICON[l.type] || 'info'}
+      </span>
+      <div class="act-body">
+        <div class="act-name">${highlightName(l.name)} <span class="action-chip ${cls(l.type)}" style="font-size:0.72rem;">${esc(TEXT[l.type] || l.type)}</span></div>
+        <div class="act-meta">${esc(l.ev)} · ${esc(l.label || '')} · ${new Date(l.ts).toLocaleString()}</div>
+      </div>
+    </div>
+  `).join('');
+
+  return `
+    <div class="section-title"><span class="material-symbols-outlined">history</span> Recent Activity (Last ${log.length} changes)</div>
+    <div class="activity-view-container">
+      ${rows}
+    </div>
+  `;
+}
+
 function openSlotModal(slotKey) {
   if (!currentData || !currentData.snapshots || !currentData.snapshots[slotKey]) return;
   activeModalSlotKey = slotKey;
@@ -1790,7 +2181,7 @@ function updateModalContent(slotKey) {
 
   const log = (currentData.log || []).filter((l) => l.slot === slotKey && l.type !== 'tracking');
 
-  document.getElementById('modalTitle').textContent = (s.events || []).join(' / ') || 'CourtReserve Event';
+  document.getElementById('modalTitle').textContent = eventNames(s).join(' / ') || 'CourtReserve Event';
   document.getElementById('modalSubtitle').innerHTML = `
     <span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; color:var(--md-primary)">schedule</span>
     <b>${fmtTime(s.time)}</b> · ${formattedDate} (${relLabel})
@@ -1802,6 +2193,10 @@ function updateModalContent(slotKey) {
     <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
     ${s.updated ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:13px">update</span> Checked ${new Date(s.updated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>` : ''}
   `;
+
+  // Update modal's CourtReserve link to point to the actual event
+  const crLink = document.getElementById('modalCrLink');
+  if (crLink) crLink.href = eventUrl(firstEventNumber(s));
 
   document.getElementById('modalActivityBadge').textContent = log.length;
   document.getElementById('modalRosterBadge').textContent = `${regNames.length + waitNames.length}`;
@@ -1865,6 +2260,16 @@ document.addEventListener('keydown', (e) => {
 });
 
 function render(d) {
+  // Init user name input
+  const nameInput = document.getElementById('userNameInput');
+  if (nameInput && !nameInput.dataset.bound) {
+    nameInput.dataset.bound = '1';
+    nameInput.value = userName;
+    if (userName) document.getElementById('userNameCheck').style.display = '';
+    nameInput.addEventListener('blur', () => setUserName(nameInput.value));
+    nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setUserName(nameInput.value); nameInput.blur(); } });
+  }
+
   currentData = d;
   initDateIfNeeded(d);
   renderCurrentView();
@@ -1874,6 +2279,48 @@ function render(d) {
     ? `<span class="material-symbols-outlined" style="font-size:12px">check_circle</span> Updated ${new Date(updatedTs).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` 
     : '';
 }
+
+
+// ── Swipe handlers for Day view ──
+function attachSwipeHandlers() {
+  const container = document.querySelector('.day-slots-wrapper') || document.querySelector('.day-view-container');
+  if (!container || container.dataset.swipeBound) return;
+  container.dataset.swipeBound = '1';
+
+  let startX = 0, startY = 0, swiping = false;
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('summary') || e.target.closest('input')) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    swiping = true;
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (!swiping) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  container.addEventListener('touchend', (e) => {
+    if (!swiping) return;
+    swiping = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx > 0) {
+        selectedDate.setDate(selectedDate.getDate() - 1);
+      } else {
+        selectedDate.setDate(selectedDate.getDate() + 1);
+      }
+      renderCurrentView();
+    }
+  });
+}
+
 
 async function load() {
   const reloadBtn = document.getElementById('reload');
