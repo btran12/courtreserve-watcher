@@ -37,6 +37,9 @@ let currentView = (() => {
 let selectedDate = new Date();
 let dateInitialized = false;
 
+// Restore view/date from URL if present (overrides localStorage / defaults)
+restoreFromUrl();
+
 // ── User name ──
 let userName = localStorage.getItem('crw_user_name') || '';
 function setUserName(name) {
@@ -250,6 +253,7 @@ function initDateIfNeeded(data) {
 function setView(view) {
   currentView = view;
   localStorage.setItem('crw_view', view);
+  syncUrl();
   renderCurrentView();
   // Attach swipe handlers when entering day view
   if (view === 'day') setTimeout(attachSwipeHandlers, 100);
@@ -257,6 +261,7 @@ function setView(view) {
 
 function navToday() {
   selectedDate = new Date();
+  syncUrl();
   renderCurrentView();
 }
 
@@ -266,6 +271,7 @@ function navPrev() {
   } else {
     selectedDate.setDate(selectedDate.getDate() - 7);
   }
+  syncUrl();
   renderCurrentView();
 }
 
@@ -275,6 +281,7 @@ function navNext() {
   } else {
     selectedDate.setDate(selectedDate.getDate() + 7);
   }
+  syncUrl();
   renderCurrentView();
 }
 
@@ -283,7 +290,31 @@ function selectDay(dateStr) {
   selectedDate = new Date(y, m - 1, d);
   currentView = 'day';
   localStorage.setItem('crw_view', 'day');
+  syncUrl();
   renderCurrentView();
+}
+
+// ── URL state sync ──
+function syncUrl() {
+  const params = new URLSearchParams();
+  params.set('view', currentView);
+  params.set('date', toDateStr(selectedDate));
+  history.replaceState(null, '', '#' + params.toString());
+}
+
+function restoreFromUrl() {
+  const hash = location.hash.slice(1);
+  if (!hash) return;
+  const params = new URLSearchParams(hash);
+  const v = params.get('view');
+  const d = params.get('date');
+  if (v && ['week','day','list','activity'].includes(v)) {
+    currentView = v;
+  }
+  if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, day] = d.split('-').map(Number);
+    selectedDate = new Date(y, m - 1, day);
+  }
 }
 
 function renderCurrentView() {
