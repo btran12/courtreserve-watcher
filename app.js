@@ -140,10 +140,29 @@ function showNamePrompt() {
   };
   dismissBtn.onclick = () => {
     localStorage.setItem('crw_name_dismissed', '1');
+    updateNameDisplay();
     close();
   };
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveBtn.click(); });
   input.focus();
+}
+
+function updateNameDisplay() {
+  const display = document.getElementById('userNameDisplay');
+  const inputWrap = document.getElementById('userNameInputWrap');
+  const welcomeName = document.getElementById('welcomeName');
+  const input = document.getElementById('userNameInput');
+  const check = document.getElementById('userNameCheck');
+
+  if (userName) {
+    if (welcomeName) welcomeName.textContent = userName;
+    if (display) display.classList.add('visible');
+    if (inputWrap) inputWrap.classList.remove('visible');
+  } else {
+    if (display) display.classList.remove('visible');
+    if (inputWrap) inputWrap.classList.add('visible');
+    if (input) input.value = '';
+  }
 }
 
 function setUserName(name) {
@@ -153,6 +172,7 @@ function setUserName(name) {
   const check = document.getElementById('userNameCheck');
   if (input) input.value = userName;
   if (check) check.style.display = userName ? '' : 'none';
+  updateNameDisplay();
   renderCurrentView();
 }
 function userStatus(snapshot) {
@@ -954,6 +974,20 @@ function render(d) {
     nameInput.addEventListener('blur', () => setUserName(nameInput.value));
     nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { setUserName(nameInput.value); nameInput.blur(); } });
   }
+
+  // Init welcome display and edit button
+  const editBtn = document.querySelector('.edit-name-btn');
+  if (editBtn && !editBtn.dataset.bound) {
+    editBtn.dataset.bound = '1';
+    editBtn.addEventListener('click', () => {
+      document.getElementById('userNameDisplay').classList.remove('visible');
+      document.getElementById('userNameInputWrap').classList.add('visible');
+      document.getElementById('userNameInput').focus();
+    });
+  }
+
+  // Set initial display state
+  updateNameDisplay();
 
   currentData = d;
   initDateIfNeeded(d);

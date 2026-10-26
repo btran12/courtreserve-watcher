@@ -1221,13 +1221,37 @@
   }
 
   /* ── User name input ── */
+  /* ── User name display & edit ── */
+  .user-welcome {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    color: rgba(46, 46, 46, 0.9);
+    font-size: 0.82rem;
+    cursor: default;
+  }
+  .user-welcome.visible { display: inline-flex; }
+  .user-welcome .welcome-text { white-space: nowrap; }
+  .user-welcome .welcome-text b { color: #242424; }
+  .edit-name-btn {
+    font-size: 16px;
+    color: rgba(92, 91, 91, 0.6);
+    cursor: pointer;
+    transition: color 0.15s;
+  }
+  .edit-name-btn:hover { color: #272727; }
+
+  .user-input-wrap {
+    display: none;
+    align-items: center;
+    gap: 4px;
+  }
+  .user-input-wrap.visible { display: inline-flex; }
+
   .user-name-wrap {
     display: flex;
     align-items: center;
     gap: 4px;
-  }
-  .user-name-wrap > .material-symbols-outlined:first-child {
-    color: rgba(255,255,255,0.75) !important;
   }
   .user-name-input {
     border: 1px solid var(--md-outline);

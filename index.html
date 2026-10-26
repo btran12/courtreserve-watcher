@@ -26,9 +26,16 @@
   </div>
   <div class="header-actions">
     <div class="user-name-wrap">
-      <span class="material-symbols-outlined" style="font-size:18px; color:var(--md-on-surface-variant);">person</span>
-      <input type="text" id="userNameInput" class="user-name-input" placeholder="Your CourtReserve name" autocomplete="off" title="Enter your as it appears on CourtReserve to see your registration status">
-      <span class="material-symbols-outlined user-name-saved" id="userNameCheck" style="display:none;">check_circle</span>
+      <span id="userNameDisplay" class="user-welcome">
+        <span class="material-symbols-outlined" style="font-size:18px;">person</span>
+        <span class="welcome-text">Welcome, <b id="welcomeName"></b></span>
+        <span class="material-symbols-outlined edit-name-btn" title="Edit name">edit</span>
+      </span>
+      <span id="userNameInputWrap" class="user-input-wrap">
+        <span class="material-symbols-outlined" style="font-size:18px;">person</span>
+        <input type="text" id="userNameInput" class="user-name-input" placeholder="Your CourtReserve name" autocomplete="off" title="Enter your name as it appears on CourtReserve to see your registration status">
+        <span class="material-symbols-outlined user-name-saved" id="userNameCheck" style="display:none;">check_circle</span>
+      </span>
     </div>
     <a href="https://app.courtreserve.com/Online/Calendar/Events/17397/Day" target="_blank" rel="noopener noreferrer" class="header-btn" title="Open CourtReserve" aria-label="Open CourtReserve">
       <span class="material-symbols-outlined">open_in_new</span>
