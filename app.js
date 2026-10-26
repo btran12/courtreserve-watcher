@@ -35,8 +35,6 @@ let currentView = (() => {
   return window.innerWidth < 768 ? 'day' : 'week';
 })();
 let selectedDate = new Date();
-let activeModalSlotKey = null;
-let currentModalTab = 'activity';
 let dateInitialized = false;
 
 // ── User name ──
@@ -357,9 +355,6 @@ function renderCurrentView() {
   `;
 
   setTimeout(attachSwipeHandlers, 150);
-    if (activeModalSlotKey) {
-    updateModalContent(activeModalSlotKey);
-  }
 }
 
 function renderWeekView(d) {
@@ -400,13 +395,14 @@ function renderWeekView(d) {
           .sort((a, b) => a.localeCompare(b));
 
         return `
-          <div class="cal-event-card ${isLatest ? 'latest-card' : ''}" onclick="openSlotModal('${esc(s.key)}')" title="Click for event details & activity log">
+          <div class="cal-event-card ${isLatest ? 'latest-card' : ''}">
             <div class="cal-event-header">
               <div class="cal-event-time-row">
                 <span class="cal-event-time">
                   <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>
                   ${fmtTime(s.time)}
                 </span>
+                <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>
                 ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
               </div>
               <div class="cal-event-title">${eventLinks(s)}</div>
@@ -417,7 +413,7 @@ function renderWeekView(d) {
             </div>
 
             <!-- Participant & Waitlist Roster Preview -->
-            <div class="cal-roster-section" onclick="event.stopPropagation(); openSlotModal('${esc(s.key)}')">
+            <div class="cal-roster-section">
               <div class="cal-roster-title">
                 <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">group</span> Registered (${regNames.length})</span>
               </div>
@@ -433,14 +429,7 @@ function renderWeekView(d) {
                 <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>
               ` : ''}
             </div>
-
-            <div class="cal-card-footer">
-              <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" onclick="event.stopPropagation();" style="display:inline-flex;align-items:center;gap:4px;color:var(--md-primary);text-decoration:none;font-weight:600;">
-                <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register
-              </a>
-              <span class="material-symbols-outlined" style="font-size:14px">arrow_forward</span>
-            </div>
-          </div>
+</div>
         `;
       }).join('');
     }
@@ -550,7 +539,7 @@ function renderDayView(d) {
               <span class="day-slot-time">
                 <span class="material-symbols-outlined">schedule</span>
                 ${fmtTime(s.time)}
-              </span>
+              <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:8px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a></span>
               <div class="day-slot-events">${eventLinks(s)}</div>
               <div class="badges-row">
                 <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
@@ -560,10 +549,6 @@ function renderDayView(d) {
               </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
-              <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:4px 10px; font-size:0.75rem; text-decoration:none;" title="Register on CourtReserve">
-                <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span>
-                <span class="btn-label">Register</span>
-              </a>
               <span style="font-size:0.78rem; font-weight:600; color:var(--md-on-surface); white-space:nowrap;">
                 <span class="material-symbols-outlined" style="font-size:14px; vertical-align:middle; color:var(--md-primary);">calendar_month</span>
                 ${slotDateLabel}
@@ -571,10 +556,6 @@ function renderDayView(d) {
               <span class="chip chip-relative" style="font-size:0.7rem;">
                 <span class="material-symbols-outlined" style="font-size:12px;">event</span> ${relLabel}
               </span>
-              <button class="header-btn" onclick="openSlotModal('${esc(s.key)}')" style="margin-top:2px;">
-                <span class="material-symbols-outlined">history</span>
-                <span class="btn-label">Activity</span>
-              </button>
             </div>
           </div>
           <div class="day-slot-body">
@@ -664,7 +645,7 @@ function renderListView(d) {
           <span class="summary-title">
             <span class="material-symbols-outlined" style="color:var(--md-primary)">schedule</span>
             ${fmtTime(s.time)}
-          </span>
+          <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:6px;" title="Register on CourtReserve" onclick="event.stopPropagation();"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a></span>
           <span class="material-symbols-outlined expand-icon">expand_more</span>
         </div>
         <div class="badges-row">
@@ -674,12 +655,7 @@ function renderListView(d) {
           ${userBadgeHtml}
           ${countdownHtml}
           ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
-          <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 10px; font-size:0.75rem; text-decoration:none;" title="Register on CourtReserve" onclick="event.stopPropagation();">
-            <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register
-          </a>
-          <button class="header-btn" style="padding:3px 10px; font-size:0.75rem; margin-left:auto;" onclick="event.preventDefault(); event.stopPropagation(); openSlotModal('${esc(s.key)}')">
-            <span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> Details & Activity
-          </button>
+          
         </div>
         <div class="event-subtitle">${eventLinks(s)}</div>
       </summary>
@@ -773,145 +749,6 @@ function renderActivityView(d) {
     </div>
   `;
 }
-
-function openSlotModal(slotKey) {
-  if (!currentData || !currentData.snapshots || !currentData.snapshots[slotKey]) return;
-  activeModalSlotKey = slotKey;
-  updateModalContent(slotKey);
-  const modal = document.getElementById('eventModal');
-  modal.classList.add('open');
-  modal.setAttribute('aria-hidden', 'false');
-  document.body.style.overflow = 'hidden';
-}
-
-function closeSlotModal() {
-  activeModalSlotKey = null;
-  const modal = document.getElementById('eventModal');
-  if (modal) {
-    modal.classList.remove('open');
-    modal.setAttribute('aria-hidden', 'true');
-  }
-  document.body.style.overflow = '';
-  const searchInput = document.getElementById('modalSearchInput');
-  if (searchInput) searchInput.value = '';
-}
-
-function setModalTab(tab) {
-  currentModalTab = tab;
-  document.getElementById('modalTabBtnActivity').classList.toggle('active', tab === 'activity');
-  document.getElementById('modalTabBtnRoster').classList.toggle('active', tab === 'roster');
-  document.getElementById('modalTabActivity').style.display = tab === 'activity' ? 'block' : 'none';
-  document.getElementById('modalTabRoster').style.display = tab === 'roster' ? 'block' : 'none';
-}
-
-function updateModalContent(slotKey) {
-  if (!currentData || !currentData.snapshots) return;
-  const s = currentData.snapshots[slotKey];
-  if (!s) return;
-
-  const [y, m, d] = s.date.split('-').map(Number);
-  const slotDate = new Date(y, m - 1, d);
-  const formattedDate = slotDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const relLabel = getRelativeDateLabel(s.date);
-
-  const regNames = Object.entries(s.people)
-    .filter(([, p]) => p.status === 'reg')
-    .map(([n]) => n)
-    .sort((a, b) => a.localeCompare(b));
-  const waitNames = Object.entries(s.people)
-    .filter(([, p]) => p.status === 'wait')
-    .map(([n]) => n)
-    .sort((a, b) => a.localeCompare(b));
-
-  const log = (currentData.log || []).filter((l) => l.slot === slotKey && l.type !== 'tracking');
-
-  document.getElementById('modalTitle').innerHTML = eventLinks(s) || 'CourtReserve Event';
-  document.getElementById('modalSubtitle').innerHTML = `
-    <span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; color:var(--md-primary)">schedule</span>
-    <b>${fmtTime(s.time)}</b> · ${formattedDate} (${relLabel})
-  `;
-
-  document.getElementById('modalBadges').innerHTML = `
-    <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
-    <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
-    <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
-    ${s.updated ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:13px">update</span> Checked ${new Date(s.updated).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>` : ''}
-  `;
-
-  // Update modal's CourtReserve link to point to the actual event
-  const crLink = document.getElementById('modalCrLink');
-  if (crLink) crLink.href = eventUrl(firstEventNumber(s));
-
-  document.getElementById('modalActivityBadge').textContent = log.length;
-  document.getElementById('modalRosterBadge').textContent = `${regNames.length + waitNames.length}`;
-
-  // ── Per-event roster in modal when multiple events ──
-  const regContainer = document.getElementById('modalRegList');
-  const waitContainer = document.getElementById('modalWaitList');
-  const regTitle = document.getElementById('modalRegTitle');
-  const waitTitle = document.getElementById('modalWaitTitle');
-
-  if (hasPerEventData(s)) {
-    regTitle.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Per-Event Breakdown`;
-    regContainer.innerHTML = renderPerEventSections(s);
-    waitTitle.style.display = 'none';
-    waitContainer.style.display = 'none';
-  } else {
-    waitTitle.style.display = '';
-    waitContainer.style.display = '';
-    regTitle.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})`;
-    regContainer.innerHTML = regNames.length
-      ? `<ol class="people-list">${regNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
-      : '<div class="empty-state">No registered participants</div>';
-    waitTitle.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})`;
-    waitContainer.innerHTML = waitNames.length
-      ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
-      : '<div class="empty-state">No one on the waitlist</div>';
-  }
-
-  const activityHtml = log.length ? log.map((l) => `
-    <div class="row">
-      <div class="row-main">
-        <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
-        <b>${esc(l.name)}</b>
-      </div>
-      <div class="time">${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div>
-    </div>
-  `).join('') : '<div class="empty-state" style="padding:28px 0; text-align:center;">No changes recorded for this event yet.</div>';
-
-  document.getElementById('modalActivityList').innerHTML = activityHtml;
-
-  const searchInput = document.getElementById('modalSearchInput');
-  if (searchInput && searchInput.value) {
-    filterModalRoster(searchInput.value);
-  }
-}
-
-function filterModalRoster(query) {
-  const q = (query || '').trim().toLowerCase();
-  const regItems = document.querySelectorAll('#modalRegList li');
-  const waitItems = document.querySelectorAll('#modalWaitList li');
-
-  regItems.forEach((li) => {
-    li.style.display = (!q || li.textContent.toLowerCase().includes(q)) ? '' : 'none';
-  });
-
-  waitItems.forEach((li) => {
-    li.style.display = (!q || li.textContent.toLowerCase().includes(q)) ? '' : 'none';
-  });
-}
-
-function handleBackdropClick(e) {
-  if (e.target.id === 'eventModal') {
-    closeSlotModal();
-  }
-}
-
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && activeModalSlotKey) {
-    closeSlotModal();
-  }
-});
 
 function render(d) {
   // Init user name input

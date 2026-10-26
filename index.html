@@ -44,67 +44,6 @@
   </div>
 </main>
 
-<!-- Event Details & Activity Modal Pop-up -->
-<div id="eventModal" class="modal-overlay" onclick="handleBackdropClick(event)" role="dialog" aria-modal="true" aria-hidden="true">
-  <div class="modal-window">
-    <div class="modal-header">
-      <div class="modal-title-group">
-        <h2 class="modal-title" id="modalTitle">Event Details</h2>
-        <div class="modal-subtitle" id="modalSubtitle">Date & Time</div>
-      </div>
-      <div class="modal-header-actions">
-        <a id="modalCrLink" href="https://app.courtreserve.com/Online/Calendar/Events/17397/Day" target="_blank" rel="noopener noreferrer" class="header-btn" title="Open in CourtReserve">
-          <span class="material-symbols-outlined">open_in_new</span>
-          <span class="btn-label">CourtReserve</span>
-        </a>
-        <button class="modal-close-btn" onclick="closeSlotModal()" aria-label="Close dialog">
-          <span class="material-symbols-outlined">close</span>
-        </button>
-      </div>
-    </div>
-    
-    <div class="modal-summary-bar" id="modalBadges"></div>
-
-    <div class="modal-tab-nav">
-      <button id="modalTabBtnActivity" class="modal-tab-btn active" onclick="setModalTab('activity')">
-        <span class="material-symbols-outlined">history</span> Activity History <span class="tab-count-badge" id="modalActivityBadge">0</span>
-      </button>
-      <button id="modalTabBtnRoster" class="modal-tab-btn" onclick="setModalTab('roster')">
-        <span class="material-symbols-outlined">group</span> Participants Roster <span class="tab-count-badge" id="modalRosterBadge">0</span>
-      </button>
-    </div>
-
-    <div class="modal-body">
-      <!-- Activity Tab Content -->
-      <div id="modalTabActivity">
-        <div id="modalActivityList"></div>
-      </div>
-
-      <!-- Roster Tab Content -->
-      <div id="modalTabRoster" style="display: none;">
-        <div class="search-wrap">
-          <span class="material-symbols-outlined">search</span>
-          <input type="text" id="modalSearchInput" class="search-input-box" placeholder="Search participants..." oninput="filterModalRoster(this.value)">
-        </div>
-        <div class="modal-roster-grid">
-          <div class="box-container">
-            <div class="box-title" id="modalRegTitle">
-              <span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered
-            </div>
-            <div id="modalRegList"></div>
-          </div>
-          <div class="box-container">
-            <div class="box-title" id="modalWaitTitle">
-              <span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist
-            </div>
-            <div id="modalWaitList"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <script src="app.js" defer></script>
 </body>
 </html>

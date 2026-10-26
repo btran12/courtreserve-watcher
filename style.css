@@ -1070,17 +1070,26 @@
   }
 
   @media (max-width: 600px) {
-    header { padding: 10px 12px; }
-    main { padding: 12px 8px; }
-    .roster-2col { grid-template-columns: 1fr; gap: 0; }
-    summary { padding: 12px; }
-    .card-body { padding: 0 12px 12px 12px; }
-    .header-title-group { gap: 8px; }
-    header h1 { font-size: 0.95rem; }
+    /* ── Header: compact layout ── */
+    header {
+      padding: 8px 10px;
+      gap: 6px;
+    }
+    .header-title-group { gap: 6px; }
+    .app-icon {
+      font-size: 22px;
+      padding: 6px;
+      border-radius: 10px;
+    }
+    header h1 { font-size: 0.85rem; }
+    .last-updated { display: none; }
+    .header-actions { gap: 4px; }
+
+    /* Header buttons: icon-only circles */
     .header-btn .btn-label { display: none; }
     .header-btn {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       padding: 0;
       border-radius: 50%;
       justify-content: center;
@@ -1089,43 +1098,81 @@
     }
     .header-btn:hover { background: rgba(25, 118, 210, 0.08); }
     .header-btn:active { background: rgba(25, 118, 210, 0.2); }
-    .header-btn .material-symbols-outlined { font-size: 24px; }
-    .nav-toolbar { padding: 8px 12px; gap: 10px; }
-    .date-nav-controls { width: 100%; justify-content: space-between; }
-    .date-display-title { font-size: 0.85rem; min-width: unset; }
-    .seg-btn { padding: 5px 10px; font-size: 0.78rem; }
+    .header-btn .material-symbols-outlined { font-size: 22px; }
+
+    /* User name input: compact */
+    .user-name-wrap .material-symbols-outlined { font-size: 16px; }
+    .user-name-input {
+      width: 80px;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+    }
+    .user-name-saved { font-size: 14px; }
+
+    /* Reload button: slightly smaller */
+    .icon-btn { width: 36px; height: 36px; }
+
+    /* ── Tab menu: icon-only, full-width ── */
+    .nav-toolbar {
+      flex-direction: column;
+      padding: 8px 10px;
+      gap: 8px;
+    }
+    .view-segmented-btn {
+      width: 100%;
+      justify-content: space-around;
+    }
+    .seg-btn {
+      padding: 6px 8px;
+      font-size: 0.75rem;
+      gap: 4px;
+      flex: 1;
+      justify-content: center;
+    }
+    .seg-btn .seg-label { display: none; }
+    .seg-btn .material-symbols-outlined { font-size: 20px; }
+
+    /* Date nav: full-width row below tabs */
+    .date-nav-controls {
+      width: 100%;
+      justify-content: space-between;
+    }
+    .date-display-title { font-size: 0.82rem; min-width: unset; }
+    .nav-btn { padding: 5px 8px; font-size: 0.78rem; }
+    .nav-btn-icon { width: 32px; height: 32px; }
+
+    main { padding: 10px 6px; }
+    summary { padding: 10px; }
+    .card-body { padding: 0 10px 10px 10px; }
     .modal-roster-grid { grid-template-columns: 1fr; }
 
-    /* ── Mobile Day View simplification ── */
+    /* ── Mobile Day View ── */
     .day-compact-date {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 10px 12px;
-    background: var(--md-surface);
-    border-radius: 12px;
-    border: 1px solid var(--md-outline);
-    margin-bottom: 12px;
-  }
-  .day-compact-date .compact-date-label {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--md-on-surface);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .day-header-card {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--md-surface);
+      border-radius: 12px;
+      border: 1px solid var(--md-outline);
+      margin-bottom: 12px;
+    }
+    .day-compact-date .compact-date-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--md-on-surface);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .day-header-card {
       padding: 8px 12px;
       flex-wrap: nowrap;
       gap: 8px;
     }
-    .day-header-title {
-      font-size: 1rem;
-    }
+    .day-header-title { font-size: 1rem; }
     .day-header-card .chip-relative {
       font-size: 0.7rem;
       padding: 2px 6px;
@@ -1134,65 +1181,25 @@
       padding: 10px 12px;
       gap: 6px;
     }
-    .day-slot-time {
-      font-size: 0.95rem;
-    }
-    .day-slot-events {
-      font-size: 0.78rem;
-    }
-    .day-slot-header .header-btn {
-      display: none;
-    }
-    .day-slot-body {
-      padding: 10px 12px;
-    }
-    /* Two-column roster on mobile: registered | waitlist */
+    .day-slot-time { font-size: 0.95rem; }
+    .day-slot-events { font-size: 0.78rem; }
+    .day-slot-header .header-btn { display: none; }
+    .day-slot-body { padding: 10px 12px; }
     .day-slot-body .event-grid {
       grid-template-columns: 1fr 1fr;
       gap: 10px;
     }
-    .day-slot-body .box-container {
-      padding: 8px;
-    }
-    .day-slot-body .box-title {
-      font-size: 0.72rem;
-      margin-bottom: 4px;
-    }
-    .day-slot-body .people-list {
-      font-size: 0.92rem;
-      padding-left: 18px;
-    }
-    .day-slot-body .people-list li {
-      padding: 3px 0;
-    }
-    .day-slot-body .empty-state {
-      font-size: 0.8rem;
-    }
-    /* Day ribbon compact */
-    .day-ribbon {
-      gap: 4px;
-      padding: 6px;
-    }
-    .day-ribbon-btn {
-      padding: 6px 2px;
-      min-width: 38px;
-    }
-    .ribbon-day-name {
-      font-size: 0.65rem;
-    }
-    .ribbon-day-val {
-      font-size: 1rem;
-    }
+    .day-slot-body .box-container { padding: 8px; }
+    .day-slot-body .box-title { font-size: 0.72rem; margin-bottom: 4px; }
+    .day-slot-body .people-list { font-size: 0.85rem; padding-left: 16px; }
+    .day-slot-body .people-list li { padding: 3px 0; }
+    .day-slot-body .empty-state { font-size: 0.8rem; }
 
-    /* User name input in header */
-    .user-name-wrap {
-      display: inline-flex;
-      align-items: center;
-    }
-    .user-name-input {
-      width: 90px;
-      font-size: 0.78rem;
-    }
+    /* Day ribbon compact */
+    .day-ribbon { gap: 4px; padding: 6px; }
+    .day-ribbon-btn { padding: 6px 2px; min-width: 38px; }
+    .ribbon-day-name { font-size: 0.65rem; }
+    .ribbon-day-val { font-size: 1rem; }
   }
 
   /* ── User name input ── */
