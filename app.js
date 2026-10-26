@@ -1044,13 +1044,10 @@ function attachSwipeHandlers() {
 
 
 async function load() {
-  const reloadBtn = document.getElementById('reload');
-  reloadBtn.classList.add('spinning');
   const app = document.getElementById('app');
   
   if (!src) { 
     app.innerHTML = '<div class="err">Set DATA_URL in this file or open with ?src=&lt;url to state.json&gt;</div>'; 
-    reloadBtn.classList.remove('spinning');
     return; 
   }
   
@@ -1061,7 +1058,6 @@ async function load() {
   } catch (e) { 
     app.innerHTML = `<div class="err">Failed to load data: ${esc(e.message)} (check bucket CORS / URL)</div>`; 
   } finally {
-    reloadBtn.classList.remove('spinning');
   }
 }
 
@@ -1070,7 +1066,6 @@ document.getElementById('app').addEventListener('toggle', (e) => {
   e.target.open ? open.add(k) : open.delete(k);
 }, true);
 
-document.getElementById('reload').onclick = load;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
 setInterval(load, 60000);
 load();
