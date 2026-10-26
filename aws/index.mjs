@@ -8,9 +8,9 @@ const DEFAULT_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 
 const CONFIG = {
   orgId: '17397',
-  days: [1, 3, 5],
+  days: [1, 2, 3, 4, 5],
   startAtOrAfterMinutes: 19 * 60,
-  weeksAhead: 4,
+  weeksAhead: 3,
   maxLogEntries: 3000,
   concurrency: 3,
 };
