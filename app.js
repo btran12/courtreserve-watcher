@@ -40,6 +40,85 @@ let dateInitialized = false;
 // Restore view/date from URL if present (overrides localStorage / defaults)
 restoreFromUrl();
 
+// ── Watched events ──
+const watchedEvents = new Set(JSON.parse(localStorage.getItem('crw_watched') || '[]'));
+let lastWatchSnapshot = JSON.parse(localStorage.getItem('crw_watch_snapshot') || '{}');
+
+function toggleWatch(slotKey) {
+  if (watchedEvents.has(slotKey)) {
+    watchedEvents.delete(slotKey);
+  } else {
+    watchedEvents.add(slotKey);
+  }
+  localStorage.setItem('crw_watched', JSON.stringify([...watchedEvents]));
+  renderCurrentView();
+}
+
+function checkWatchedChanges(data) {
+  if (!data || !data.snapshots) return;
+  const newSnap = {};
+  const toasts = [];
+
+  for (const key of watchedEvents) {
+    const s = data.snapshots[key];
+    if (!s) continue;
+    const regCount = Object.values(s.people).filter(p => p.status === 'reg').length;
+    const waitCount = Object.values(s.people).filter(p => p.status === 'wait').length;
+    const evData = (s.events && s.events[0]) || {};
+    const spots = evData.spotsRemaining != null ? evData.spotsRemaining
+      : evData.capacity != null ? Math.max(0, evData.capacity - regCount) : null;
+
+    newSnap[key] = { regCount, waitCount, spots };
+
+    const prev = lastWatchSnapshot[key];
+    if (!prev) continue; // first time seeing this event, no toast
+
+    // Spot-opened toast
+    if (spots != null && prev.spots != null && prev.spots === 0 && spots > 0) {
+      const time = fmtTime(s.time);
+      const evName = (s.events && s.events[0]) ? s.events[0].name : key;
+      toasts.push({ type: 'spot-open', title: `${spots} spot${spots > 1 ? 's' : ''} opened!`, detail: `${evName} — ${time}`, key });
+    }
+    // General change toast (roster changed)
+    else if (regCount !== prev.regCount || waitCount !== prev.waitCount) {
+      const time = fmtTime(s.time);
+      const evName = (s.events && s.events[0]) ? s.events[0].name : key;
+      const diffs = [];
+      if (regCount !== prev.regCount) diffs.push(`${regCount} registered (was ${prev.regCount})`);
+      if (waitCount !== prev.waitCount) diffs.push(`${waitCount} waitlisted (was ${prev.waitCount})`);
+      toasts.push({ type: 'change', title: 'Roster changed', detail: `${evName} — ${time} · ${diffs.join(', ')}`, key });
+    }
+  }
+
+  lastWatchSnapshot = newSnap;
+  localStorage.setItem('crw_watch_snapshot', JSON.stringify(newSnap));
+
+  if (toasts.length) {
+    ensureToastContainer();
+    for (const t of toasts) showToast(t);
+  }
+}
+
+function ensureToastContainer() {
+  if (document.getElementById('toastContainer')) return;
+  const el = document.createElement('div');
+  el.id = 'toastContainer';
+  el.className = 'toast-container';
+  document.body.appendChild(el);
+}
+
+function showToast(t) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast ${t.type}`;
+  el.innerHTML = `<span class="toast-icon material-symbols-outlined" style="color:${t.type === 'spot-open' ? '#2e7d32' : '#1976d2'}">${t.type === 'spot-open' ? 'event_available' : 'campaign'}</span>
+    <div class="toast-body"><div class="toast-title">${t.title}</div><div class="toast-detail">${t.detail}</div></div>`;
+  el.onclick = () => { el.classList.add('dismissing'); setTimeout(() => el.remove(), 250); };
+  container.appendChild(el);
+  setTimeout(() => { if (el.parentNode) { el.classList.add('dismissing'); setTimeout(() => el.remove(), 250); } }, 6000);
+}
+
 // ── User name ──
 let userName = localStorage.getItem('crw_user_name') || '';
 function setUserName(name) {
@@ -448,6 +527,7 @@ function renderWeekView(d) {
                   : wStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
                   : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
                   : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
+                <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button>
                 ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
               </div>
               <div class="cal-event-title">${eventLinks(s)}</div>
@@ -607,7 +687,8 @@ function renderDayView(d) {
               ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
                 : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
                 : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:8px;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-                : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}</span>
+                : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
+              <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button></span>
               <div class="day-slot-events">${eventLinks(s)}</div>
               <div class="badges-row">
                 <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} out of ${dayCap || '?'} registered</span>
@@ -727,7 +808,8 @@ function renderListView(d) {
           ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
             : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
             : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:6px;border-radius:6px;" title="Register on CourtReserve" onclick="event.stopPropagation();"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-            : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}</span>
+            : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
+          <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.preventDefault();event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button></span>
           <span class="material-symbols-outlined expand-icon">expand_more</span>
         </div>
         <div class="badges-row">
@@ -845,6 +927,8 @@ function render(d) {
   currentData = d;
   initDateIfNeeded(d);
   renderCurrentView();
+
+  checkWatchedChanges(d);
 
   const updatedTs = d.updated || d.lastRun || d.uploadedAt;
   document.getElementById('status').innerHTML = updatedTs 
