@@ -1,0 +1,13 @@
+{
+  "name": "CourtReserve Watcher",
+  "short_name": "CR Watcher",
+  "description": "Pickleball event roster watcher for CourtReserve",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1565c0",
+  "theme_color": "#1565c0",
+  "icons": [
+    { "src": "icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
