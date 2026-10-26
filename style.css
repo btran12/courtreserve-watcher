@@ -1081,7 +1081,7 @@
       padding: 6px;
       border-radius: 10px;
     }
-    header h1 { font-size: 0.85rem; }
+    header h1 { font-size: 0.95rem; }
     .last-updated { display: none; }
     .header-actions { gap: 4px; }
 
@@ -1104,7 +1104,7 @@
     .user-name-wrap .material-symbols-outlined { font-size: 16px; }
     .user-name-input {
       width: 80px;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       padding: 3px 8px;
     }
     .user-name-saved { font-size: 14px; }
@@ -1124,7 +1124,7 @@
     }
     .seg-btn {
       padding: 6px 8px;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       gap: 4px;
       flex: 1;
       justify-content: center;
@@ -1137,8 +1137,8 @@
       width: 100%;
       justify-content: space-between;
     }
-    .date-display-title { font-size: 0.82rem; min-width: unset; }
-    .nav-btn { padding: 5px 8px; font-size: 0.78rem; }
+    .date-display-title { font-size: 0.9rem; min-width: unset; }
+    .nav-btn { padding: 5px 8px; font-size: 0.82rem; }
     .nav-btn-icon { width: 32px; height: 32px; }
 
     main { padding: 10px 6px; }
@@ -1181,8 +1181,8 @@
       padding: 10px 12px;
       gap: 6px;
     }
-    .day-slot-time { font-size: 0.95rem; }
-    .day-slot-events { font-size: 0.78rem; }
+    .day-slot-time { font-size: 1rem; }
+    .day-slot-events { font-size: 0.82rem; }
     .day-slot-header .header-btn { display: none; }
     .day-slot-body { padding: 10px 12px; }
     .day-slot-body .event-grid {
@@ -1190,16 +1190,16 @@
       gap: 10px;
     }
     .day-slot-body .box-container { padding: 8px; }
-    .day-slot-body .box-title { font-size: 0.72rem; margin-bottom: 4px; }
-    .day-slot-body .people-list { font-size: 0.85rem; padding-left: 16px; }
+    .day-slot-body .box-title { font-size: 0.78rem; margin-bottom: 4px; }
+    .day-slot-body .people-list { font-size: 0.9rem; padding-left: 16px; }
     .day-slot-body .people-list li { padding: 3px 0; }
-    .day-slot-body .empty-state { font-size: 0.8rem; }
+    .day-slot-body .empty-state { font-size: 0.85rem; }
 
     /* Day ribbon compact */
     .day-ribbon { gap: 4px; padding: 6px; }
     .day-ribbon-btn { padding: 6px 2px; min-width: 38px; }
-    .ribbon-day-name { font-size: 0.65rem; }
-    .ribbon-day-val { font-size: 1rem; }
+    .ribbon-day-name { font-size: 0.7rem; }
+    .ribbon-day-val { font-size: 1.1rem; }
   }
 
   /* ── User name input ── */

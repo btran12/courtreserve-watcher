@@ -463,6 +463,8 @@ function renderDayView(d) {
   const selectedDateStr = toDateStr(selectedDate);
   const todayStr = toDateStr(new Date());
 
+  const log = (d.log || []).filter((l) => l.type !== 'tracking');
+
   const slotsByDate = {};
   for (const s of Object.values(d.snapshots)) {
     if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
@@ -532,6 +534,15 @@ function renderDayView(d) {
         ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>`
         : '<div class="empty-state">No one on the waitlist</div>';
 
+      const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
+        `<div class="row">
+          <div class="row-main">
+            <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
+            <b>${esc(l.name)}</b>
+          </div>
+          <div class="time">${new Date(l.ts).toLocaleString()}</div>
+        </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
+
       return `
         <div class="day-slot-card">
           <div class="day-slot-header">
@@ -572,6 +583,10 @@ function renderDayView(d) {
               </div>
             </div>`
             }
+            <div class="box-container" style="margin-top:12px;">
+              <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
+              ${ch}
+            </div>
           </div>
         </div>
       `;
