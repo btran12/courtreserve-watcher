@@ -622,7 +622,7 @@ function renderDayView(d) {
 
   const daySlots = (slotsByDate[selectedDateStr] || []).sort((a, b) => a.time.localeCompare(b.time));
   const fullDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const slotDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const slotDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
   const relLabel = getRelativeDateLabel(selectedDateStr);
 
   let slotsHtml = '';
@@ -690,6 +690,10 @@ function renderDayView(d) {
               <span class="day-slot-time">
                 <span class="material-symbols-outlined">schedule</span>
                 ${fmtTime(s.time)}
+                <span style="font-size:0.78rem; font-weight:600; color:var(--md-on-surface); white-space:nowrap;">
+                <span class="material-symbols-outlined" style="font-size:14px; vertical-align:middle; color:var(--md-primary);">calendar_month</span>
+                ${slotDateLabel}
+              </span>
               ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
                 : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
                 : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:8px;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
@@ -703,10 +707,6 @@ function renderDayView(d) {
               </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
-              <span style="font-size:0.78rem; font-weight:600; color:var(--md-on-surface); white-space:nowrap;">
-                <span class="material-symbols-outlined" style="font-size:14px; vertical-align:middle; color:var(--md-primary);">calendar_month</span>
-                ${slotDateLabel}
-              </span>
               <span class="chip chip-relative" style="font-size:0.7rem;">
                 <span class="material-symbols-outlined" style="font-size:12px;">event</span> ${relLabel}
               </span>
