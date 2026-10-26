@@ -48,5 +48,19 @@
 
 <script src="app.js" defer></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>
+
+<!-- Name prompt overlay -->
+<div id="namePrompt" class="prompt-overlay">
+  <div class="prompt-card">
+    <span class="material-symbols-outlined prompt-icon">person</span>
+    <h2>Welcome!</h2>
+    <p>Enter your name as it appears on CourtReserve to see your registration status across all events.</p>
+    <input type="text" id="promptNameInput" class="prompt-input" placeholder="Your CourtReserve name..." autocomplete="off">
+    <div class="prompt-actions">
+      <button id="promptDismiss" class="prompt-btn secondary">Don't ask again</button>
+      <button id="promptSave" class="prompt-btn primary">Save</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

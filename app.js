@@ -121,6 +121,31 @@ function showToast(t) {
 
 // ── User name ──
 let userName = localStorage.getItem('crw_user_name') || '';
+
+// Show startup name prompt if not set and not dismissed
+function showNamePrompt() {
+  const prompt = document.getElementById('namePrompt');
+  if (!prompt) return;
+  if (userName || localStorage.getItem('crw_name_dismissed')) return;
+  prompt.classList.add('open');
+  const input = document.getElementById('promptNameInput');
+  const saveBtn = document.getElementById('promptSave');
+  const dismissBtn = document.getElementById('promptDismiss');
+
+  const close = () => prompt.classList.remove('open');
+  saveBtn.onclick = () => {
+    const val = input.value.trim();
+    if (val) setUserName(val);
+    close();
+  };
+  dismissBtn.onclick = () => {
+    localStorage.setItem('crw_name_dismissed', '1');
+    close();
+  };
+  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveBtn.click(); });
+  input.focus();
+}
+
 function setUserName(name) {
   userName = name.trim();
   localStorage.setItem('crw_user_name', userName);
@@ -1015,3 +1040,4 @@ document.getElementById('reload').onclick = load;
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
 setInterval(load, 60000);
 load();
+showNamePrompt();
