@@ -394,9 +394,16 @@ function renderWeekView(d) {
           .map(([n]) => n)
           .sort((a, b) => a.localeCompare(b));
 
-        const evData = (s.events && s.events[0]) || {};
-        const openSpots = evData.spotsRemaining != null ? evData.spotsRemaining
-          : evData.capacity != null ? Math.max(0, evData.capacity - regNames.length) : null;
+        let weekCap = null, weekRem = null;
+        if (s.events) for (const e of s.events) {
+          if (e.capacity != null) weekCap = (weekCap || 0) + e.capacity;
+          if (e.spotsRemaining != null) weekRem = (weekRem || 0) + e.spotsRemaining;
+        }
+        const openSpots = weekRem != null ? weekRem
+          : weekCap != null ? Math.max(0, weekCap - regNames.length) : null;
+
+        const wStatus = userStatus(s);
+        const regOpen = getDaysUntilRegOpens(s.date) <= 0;
 
         return `
           <div class="cal-event-card ${isLatest ? 'latest-card' : ''}">
@@ -406,7 +413,10 @@ function renderWeekView(d) {
                   <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>
                   ${fmtTime(s.time)}
                 </span>
-                <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>
+                ${wStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
+                  : wStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
+                  : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
+                  : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
                 ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
               </div>
               <div class="cal-event-title">${eventLinks(s)}</div>
@@ -524,11 +534,15 @@ function renderDayView(d) {
       const col2 = regNames.slice(half);
       const uStatus = userStatus(s);
       const userBadgeHtml = userStatusBadgeHtml(uStatus);
-      const countdownHtml = regCountdownHtml(s.date);
+      const regOpen = getDaysUntilRegOpens(s.date) <= 0;
 
-      const evData = (s.events && s.events[0]) || {};
-      const dayOpenSpots = evData.spotsRemaining != null ? evData.spotsRemaining
-        : evData.capacity != null ? Math.max(0, evData.capacity - regNames.length) : null;
+      let dayCap = null, dayRem = null;
+      if (s.events) for (const e of s.events) {
+        if (e.capacity != null) dayCap = (dayCap || 0) + e.capacity;
+        if (e.spotsRemaining != null) dayRem = (dayRem || 0) + e.spotsRemaining;
+      }
+      const dayOpenSpots = dayRem != null ? dayRem
+        : dayCap != null ? Math.max(0, dayCap - regNames.length) : null;
 
       const makeList = (items, startIdx, hlFn) => 
         `<ol class="people-list" start="${startIdx}">` +
@@ -559,14 +573,15 @@ function renderDayView(d) {
               <span class="day-slot-time">
                 <span class="material-symbols-outlined">schedule</span>
                 ${fmtTime(s.time)}
-              <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:8px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a></span>
+              ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
+                : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
+                : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:8px;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
+                : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}</span>
               <div class="day-slot-events">${eventLinks(s)}</div>
               <div class="badges-row">
-                <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
+                <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} out of ${dayCap || '?'} registered</span>
                 <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
-                ${dayOpenSpots != null ? (dayOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span> FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${dayOpenSpots} open</span>`) : ''}
-                ${userBadgeHtml}
-                ${countdownHtml}
+                ${dayOpenSpots != null ? (dayOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span> Event FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${dayOpenSpots} spots open</span>`) : ''}
               </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
@@ -653,11 +668,15 @@ function renderListView(d) {
     const relLabel = getRelativeDateLabel(s.date);
     const uStatus = userStatus(s);
     const userBadgeHtml = userStatusBadgeHtml(uStatus);
-    const countdownHtml = regCountdownHtml(s.date);
+    const regOpen = getDaysUntilRegOpens(s.date) <= 0;
 
-    const listEvData = (s.events && s.events[0]) || {};
-    const listOpenSpots = listEvData.spotsRemaining != null ? listEvData.spotsRemaining
-      : listEvData.capacity != null ? Math.max(0, listEvData.capacity - count(s, 'reg')) : null;
+    let listCap = null, listRem = null;
+    if (s.events) for (const e of s.events) {
+      if (e.capacity != null) listCap = (listCap || 0) + e.capacity;
+      if (e.spotsRemaining != null) listRem = (listRem || 0) + e.spotsRemaining;
+    }
+    const listOpenSpots = listRem != null ? listRem
+      : listCap != null ? Math.max(0, listCap - count(s, 'reg')) : null;
 
     const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
       `<div class="row">
@@ -674,17 +693,18 @@ function renderListView(d) {
           <span class="summary-title">
             <span class="material-symbols-outlined" style="color:var(--md-primary)">schedule</span>
             ${fmtTime(s.time)}
-          <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:6px;" title="Register on CourtReserve" onclick="event.stopPropagation();"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a></span>
+          ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
+            : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
+            : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:6px;border-radius:6px;" title="Register on CourtReserve" onclick="event.stopPropagation();"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
+            : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}</span>
           <span class="material-symbols-outlined expand-icon">expand_more</span>
         </div>
         <div class="badges-row">
           <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
-          <span class="chip chip-reg">${count(s, 'reg')} registered</span>
+          <span class="chip chip-reg">${count(s, 'reg')} out of ${listCap || '?'} registered</span>
           <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
-          ${listOpenSpots != null ? (listOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span> FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${listOpenSpots} open</span>`) : ''}
-          ${userBadgeHtml}
-          ${countdownHtml}
-          ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
+          ${listOpenSpots != null ? (listOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span>Event FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${listOpenSpots} spots open</span>`) : ''}
+          ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Last updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
           
         </div>
         <div class="event-subtitle">${eventLinks(s)}</div>

@@ -296,13 +296,6 @@ export const handler = async () => {
     for (const pe of perEvent) {
       perEventMap[pe.eventName] = { reg: pe.reg, wait: pe.wait, capacity: pe.capacity, spotsRemaining: pe.spotsRemaining };
     }
-
-    if (!prev && state.initialized) {
-      newLog.push({ ts, slot: slot.key, label: slotLabel(slot), type: 'tracking', name: '', ev: slot.events.map((e) => e.name).join(' / '),
-        note: `${Object.values(people).filter((p) => p.status === 'reg').length} registered, ${Object.values(people).filter((p) => p.status === 'wait').length} waitlisted` });
-    } else if (prev) {
-      diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
-    }
     snapshots[slot.key] = {
       key: slot.key, date: slot.date, time: slot.time,
       events: slot.events.map((e) => ({
