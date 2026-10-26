@@ -354,7 +354,7 @@ function renderCurrentView() {
     </div>
   `;
 
-  setTimeout(attachSwipeHandlers, 150);
+  if (currentView === 'day') setTimeout(attachSwipeHandlers, 150);
 }
 
 function renderWeekView(d) {
