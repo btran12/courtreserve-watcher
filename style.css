@@ -1200,6 +1200,24 @@
     .day-ribbon-btn { padding: 6px 2px; min-width: 38px; }
     .ribbon-day-name { font-size: 0.7rem; }
     .ribbon-day-val { font-size: 1.1rem; }
+
+    /* ── Name prompt: mobile fixes ── */
+    .prompt-overlay {
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: none;
+      padding: 16px;
+    }
+    .prompt-card {
+      padding: 24px 20px 20px;
+      border-radius: 16px;
+      gap: 10px;
+    }
+    .prompt-icon { font-size: 40px; padding: 12px; }
+    .prompt-card h2 { font-size: 1.1rem; }
+    .prompt-card p { font-size: 0.8rem; }
+    .prompt-input { font-size: 16px; padding: 10px 12px; }
+    .prompt-actions { flex-direction: column; gap: 8px; }
+    .prompt-btn { padding: 12px 16px; font-size: 0.9rem; }
   }
 
   /* ── User name input ── */
