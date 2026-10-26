@@ -54,7 +54,9 @@ function slotLabel(slot) {
 function buildSlots(events, now) {
   const seen = new Set();
   const slots = new Map();
+  let _keysLogged = false;
   for (const ev of events) {
+    if (!_keysLogged) { console.log('Event keys:', Object.keys(ev).sort().join(', ')); _keysLogged = true; }
     if (seen.has(ev.ReservationId)) continue;
     seen.add(ev.ReservationId);
     const start = parseMsDate(ev.Start);
@@ -70,6 +72,8 @@ function buildSlots(events, now) {
       name: clean(ev.EventName || ev.Title),
       signed: ev.SignedMembers || 0,
       wait: ev.WaitListCount || 0,
+      capacity: ev.Capacity || ev.MaxMembers || ev.MaxParticipants || ev.TotalSpots || ev.MaxCapacity || null,
+      spotsRemaining: ev.SpotsRemaining || ev.AvailableSpots || ev.OpenSpots || ev.SpotsAvailable || null,
     });
   }
   return [...slots.values()].sort((a, b) => a.key.localeCompare(b.key));
@@ -241,7 +245,32 @@ export const handler = async () => {
     } else if (prev) {
       diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
     }
-    snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => ({ name: e.name, number: e.number })), people, updated: ts };
+        // Build per-event name map for snapshot
+    const perEventMap = {};
+    for (const pe of perEvent) {
+      perEventMap[pe.eventName] = { reg: pe.reg, wait: pe.wait };
+    }
+
+    if (!prev && state.initialized) {
+      newLog.push({ ts, slot: slot.key, label: slotLabel(slot), type: 'tracking', name: '', ev: slot.events.map((e) => e.name).join(' / '),
+        note: `${Object.values(people).filter((p) => p.status === 'reg').length} registered, ${Object.values(people).filter((p) => p.status === 'wait').length} waitlisted` });
+    } else if (prev) {
+      diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
+    }
+    snapshots[slot.key] = {
+      key: slot.key, date: slot.date, time: slot.time,
+      events: slot.events.map((e) => ({
+        name: e.name,
+        number: e.number,
+        signed: e.signed,
+        waitCount: e.wait,
+        capacity: e.capacity,
+        spotsRemaining: e.spotsRemaining,
+        reg: (perEventMap[e.name] || {}).reg || [],
+        wait: (perEventMap[e.name] || {}).wait || [],
+      })),
+      people, updated: ts
+    };
   }
 
   state.snapshots = snapshots;

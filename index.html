@@ -1054,11 +1054,32 @@
     border-color: var(--md-primary);
   }
 
+  /* ── Stacked roster: registered, waitlist, activity each full-width ── */
+  .event-grid-stacked {
+    grid-template-columns: 1fr !important;
+  }
+
   /* Responsive Adjustments for Mobile & Tablets */
   @media (max-width: 992px) {
     .event-grid {
       grid-template-columns: 1fr;
     }
+  }
+
+  @media (max-width: 768px) {
+    .badges-row {
+      gap: 4px;
+    }
+    .badges-row .header-btn {
+      padding: 2px 6px;
+      font-size: 0.7rem;
+    }
+    .badges-row .chip {
+      font-size: 0.68rem;
+      padding: 1px 6px;
+    }
+    summary { padding: 10px 12px; }
+    .card-body { padding: 0 10px 10px 10px; }
   }
 
   @media (max-width: 600px) {
@@ -1471,23 +1492,78 @@ function setUserName(name) {
 }
 function userStatus(snapshot) {
   if (!userName || !snapshot) return null;
-  const key = userName.toLowerCase();
+  const key = userName.toLowerCase().trim();
   for (const [name, p] of Object.entries(snapshot.people)) {
-    if (name.toLowerCase() === key) return p.status;
+    if (name.toLowerCase().trim() === key) return p.status;
   }
   return null;
 }
 function highlightName(name) {
   if (!userName) return esc(name);
-  if (name.toLowerCase() === userName.toLowerCase()) return `<span class="user-match">${esc(name)}</span>`;
+  if (name.toLowerCase().trim() === userName.toLowerCase().trim()) return `<span class="user-match">${esc(name)}</span>`;
   return esc(name);
 }
 function highlightNameWaitlist(name) {
   if (!userName) return esc(name);
-  if (name.toLowerCase() === userName.toLowerCase()) return `<span class="user-match-waitlist">${esc(name)}</span>`;
+  if (name.toLowerCase().trim() === userName.toLowerCase().trim()) return `<span class="user-match-waitlist">${esc(name)}</span>`;
   return esc(name);
 }
 
+
+function spotsLabel(evt) {
+  const parts = [];
+  // Prefer actual scraped name count over API aggregate count
+  const regCount = (evt.reg || []).length || (evt.signed || 0);
+  parts.push('<b>' + regCount + '</b> registered');
+  if (evt.spotsRemaining != null) {
+    parts.push('<b>' + evt.spotsRemaining + '</b> open');
+  } else if (evt.capacity) {
+    const open = Math.max(0, evt.capacity - regCount);
+    parts.push('<b>' + open + '</b> open');
+  }
+  // Prefer actual scraped waitlist names over API count
+  const waitN = (evt.wait || []).length || (evt.waitCount || 0);
+  if (waitN > 0) parts.push('<b>' + waitN + '</b> waitlisted');
+  return parts.join(' \u00b7 ');
+}
+
+function hasPerEventData(s) {
+  return (s.events || []).length > 1 && s.events[0] && Array.isArray(s.events[0].reg);
+}
+
+function renderPerEventSections(s) {
+  return s.events.map((evt) => {
+    const regNames = (evt.reg || []).sort((a, b) => a.localeCompare(b));
+    const waitNames = (evt.wait || []).sort((a, b) => a.localeCompare(b));
+    const half = Math.ceil(regNames.length / 2);
+    const col1 = regNames.slice(0, half);
+    const col2 = regNames.slice(half);
+
+    const makeList = (items, startIdx, hlFn) =>
+      '<ol class="people-list" start="' + startIdx + '">' +
+      items.map((n) => '<li>' + hlFn(n) + '</li>').join('') +
+      '</ol>';
+
+    const regHtml = regNames.length
+      ? '<div class="roster-2col"><div>' + makeList(col1, 1, highlightName) + '</div><div>' + (col2.length ? makeList(col2, half + 1, highlightName) : '') + '</div></div>'
+      : '<div class="empty-state">No registered participants yet</div>';
+
+    const waitHtml = waitNames.length
+      ? '<ol class="people-list waitlist-list">' + waitNames.map((n) => '<li>' + highlightNameWaitlist(n) + '</li>').join('') + '</ol>'
+      : '';
+
+    const url = evt.number ? 'https://app.courtreserve.com/Online/Events/Details/17397/' + encodeURIComponent(evt.number) : '#';
+
+    return '<div class="box-container">' +
+      '<div class="box-title">' +
+        '<a href="' + url + '" target="_blank" rel="noopener" style="color:var(--md-primary);text-decoration:none;">' + esc(evt.name) + '</a>' +
+        ' <span style="font-weight:400;font-size:0.78rem;color:var(--md-on-surface-variant);">(' + spotsLabel(evt) + ')</span>' +
+      '</div>' +
+      regHtml +
+      (waitHtml ? '<div style="margin-top:10px;"><div class="box-title" style="color:#ed6c02;margin-bottom:4px;"><span class="material-symbols-outlined" style="font-size:16px;color:#ed6c02">hourglass_empty</span> Waitlist (' + waitNames.length + ')</div>' + waitHtml + '</div>' : '') +
+    '</div>';
+  }).join('');
+}
 // ── Registration window countdown ──
 function getDaysUntilRegOpens(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -1522,6 +1598,13 @@ function eventUrl(keyOrNumber) {
 // ── Event data helpers (events are now {name, number} objects) ──
 function eventNames(snapshot) {
   return (snapshot.events || []).map(e => typeof e === 'string' ? e : e.name);
+}
+function eventLinks(snapshot) {
+  return (snapshot.events || []).map(e => {
+    if (typeof e === 'string') return esc(e);
+    const url = eventUrl(e.number || snapshot.key);
+    return '<a href="' + url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-color:var(--md-primary);text-underline-offset:3px;">' + esc(e.name) + '</a>';
+  }).join(' / ');
 }
 function firstEventNumber(snapshot) {
   const evs = snapshot.events || [];
@@ -1713,7 +1796,7 @@ function renderCurrentView() {
     </div>
   `;
 
-  if (currentView === 'day') setTimeout(attachSwipeHandlers, 150);
+  setTimeout(attachSwipeHandlers, 150);
     if (activeModalSlotKey) {
     updateModalContent(activeModalSlotKey);
   }
@@ -1766,7 +1849,7 @@ function renderWeekView(d) {
                 </span>
                 ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
               </div>
-              <div class="cal-event-title">${esc(eventNames(s).join(' / '))}</div>
+              <div class="cal-event-title">${eventLinks(s)}</div>
               <div class="cal-badges-row">
                 <span class="cal-badge cal-badge-reg"><span class="material-symbols-outlined" style="font-size:12px">group</span> ${regNames.length} reg</span>
                 <span class="cal-badge cal-badge-wait"><span class="material-symbols-outlined" style="font-size:12px">hourglass_empty</span> ${waitNames.length} wait</span>
@@ -1908,7 +1991,7 @@ function renderDayView(d) {
                 <span class="material-symbols-outlined">schedule</span>
                 ${fmtTime(s.time)}
               </span>
-              <div class="day-slot-events">${esc(eventNames(s).join(' / '))}</div>
+              <div class="day-slot-events">${eventLinks(s)}</div>
               <div class="badges-row">
                 <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
                 <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
@@ -1935,7 +2018,9 @@ function renderDayView(d) {
             </div>
           </div>
           <div class="day-slot-body">
-            <div class="event-grid" style="margin-top:0;">
+            ${hasPerEventData(s)
+              ? '<div class="event-grid event-grid-stacked" style="margin-top:0;">' + renderPerEventSections(s) + '</div>'
+              : `<div class="event-grid event-grid-stacked" style="margin-top:0;">
               <div class="box-container">
                 <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})</div>
                 ${regRosterHtml}
@@ -1944,7 +2029,8 @@ function renderDayView(d) {
                 <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})</div>
                 ${waitRosterHtml}
               </div>
-            </div>
+            </div>`
+            }
           </div>
         </div>
       `;
@@ -1972,24 +2058,15 @@ function renderListView(d) {
       .filter(([, p]) => p.status === 'reg')
       .map(([n]) => n)
       .sort((a, b) => a.localeCompare(b));
-
     if (!names.length) return '<div class="empty-state">None</div>';
-
     const half = Math.ceil(names.length / 2);
     const col1 = names.slice(0, half);
     const col2 = names.slice(half);
-
-    const makeList = (items, startIdx) => 
+    const makeList = (items, startIdx) =>
       `<ol class="people-list" start="${startIdx}">` +
       items.map((n) => `<li>${highlightName(n)}</li>`).join('') +
       `</ol>`;
-
-    return `
-      <div class="roster-2col">
-        <div>${makeList(col1, 1)}</div>
-        <div>${col2.length ? makeList(col2, half + 1) : ''}</div>
-      </div>
-    `;
+    return `<div class="roster-2col"><div>${makeList(col1, 1)}</div><div>${col2.length ? makeList(col2, half + 1) : ''}</div></div>`;
   };
 
   const renderWaitlist = (s) => {
@@ -1997,21 +2074,20 @@ function renderListView(d) {
       .filter(([, p]) => p.status === 'wait')
       .map(([n]) => n)
       .sort((a, b) => a.localeCompare(b));
-
     if (!names.length) return '<div class="empty-state">None</div>';
-
-    return `<ol class="people-list">` +
-      names.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('') +
-      `</ol>`;
+    return `<ol class="people-list">` + names.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('') + `</ol>`;
   };
 
   const sortedSlots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key));
-  
+
   let lastDate = '';
   const slotsHtml = sortedSlots.map((s) => {
     const showDateHeader = s.date !== lastDate;
     lastDate = s.date;
     const relLabel = getRelativeDateLabel(s.date);
+    const uStatus = userStatus(s);
+    const userBadgeHtml = userStatusBadgeHtml(uStatus);
+    const countdownHtml = regCountdownHtml(s.date);
 
     const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
       `<div class="row">
@@ -2035,8 +2111,8 @@ function renderListView(d) {
           <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
           <span class="chip chip-reg">${count(s, 'reg')} registered</span>
           <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
-          ${userStatusBadgeHtml(userStatus(s))}
-          ${regCountdownHtml(s.date)}
+          ${userBadgeHtml}
+          ${countdownHtml}
           ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
           <a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 10px; font-size:0.75rem; text-decoration:none;" title="Register on CourtReserve" onclick="event.stopPropagation();">
             <span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register
@@ -2045,28 +2121,36 @@ function renderListView(d) {
             <span class="material-symbols-outlined" style="font-size:14px;">open_in_new</span> Details & Activity
           </button>
         </div>
-        <div class="event-subtitle">${esc(eventNames(s).join(' / '))}</div>
+        <div class="event-subtitle">${eventLinks(s)}</div>
       </summary>
       <div class="card-body">
-        <div class="event-grid">
-          <!-- Columns 1 & 2: Registered Roster -->
-          <div class="box-container">
-            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${count(s, 'reg')})</div>
-            ${renderRegRoster(s)}
-          </div>
-          
-          <!-- Column 3: Waitlist -->
-          <div class="box-container">
-            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${count(s, 'wait')})</div>
-            ${renderWaitlist(s)}
-          </div>
-          
-          <!-- Column 4: Activity Per Event -->
+        ${hasPerEventData(s)
+          ? renderPerEventSections(s) + `
+          <!-- Activity Per Event -->
           <div class="box-container">
             <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
             ${ch}
           </div>
-        </div>
+        </div>`
+          : `<div class="event-grid event-grid-stacked">
+          <!-- Registered Roster -->
+          <div class="box-container">
+            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${count(s, 'reg')})</div>
+            ${renderRegRoster(s)}
+          </div>
+
+          <!-- Waitlist -->
+          <div class="box-container">
+            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${count(s, 'wait')})</div>
+            ${renderWaitlist(s)}
+          </div>
+
+          <!-- Activity Per Event -->
+          <div class="box-container">
+            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
+            ${ch}
+          </div>`
+        }
       </div>
     </details>`;
 
@@ -2089,7 +2173,7 @@ function renderListView(d) {
         <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
         <b>${esc(l.name)}</b>
       </div>
-      <div class="time">${esc(l.label)} · ${esc(l.ev)} · ${new Date(l.ts).toLocaleString()}</div>
+      <div class="time">${esc(l.label)} \u00b7 ${esc(l.ev)} \u00b7 ${new Date(l.ts).toLocaleString()}</div>
     </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes recorded yet.</div>';
 
   return `
@@ -2181,7 +2265,7 @@ function updateModalContent(slotKey) {
 
   const log = (currentData.log || []).filter((l) => l.slot === slotKey && l.type !== 'tracking');
 
-  document.getElementById('modalTitle').textContent = eventNames(s).join(' / ') || 'CourtReserve Event';
+  document.getElementById('modalTitle').innerHTML = eventLinks(s) || 'CourtReserve Event';
   document.getElementById('modalSubtitle').innerHTML = `
     <span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle; color:var(--md-primary)">schedule</span>
     <b>${fmtTime(s.time)}</b> · ${formattedDate} (${relLabel})
@@ -2201,6 +2285,30 @@ function updateModalContent(slotKey) {
   document.getElementById('modalActivityBadge').textContent = log.length;
   document.getElementById('modalRosterBadge').textContent = `${regNames.length + waitNames.length}`;
 
+  // ── Per-event roster in modal when multiple events ──
+  const regContainer = document.getElementById('modalRegList');
+  const waitContainer = document.getElementById('modalWaitList');
+  const regTitle = document.getElementById('modalRegTitle');
+  const waitTitle = document.getElementById('modalWaitTitle');
+
+  if (hasPerEventData(s)) {
+    regTitle.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Per-Event Breakdown`;
+    regContainer.innerHTML = renderPerEventSections(s);
+    waitTitle.style.display = 'none';
+    waitContainer.style.display = 'none';
+  } else {
+    waitTitle.style.display = '';
+    waitContainer.style.display = '';
+    regTitle.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})`;
+    regContainer.innerHTML = regNames.length
+      ? `<ol class="people-list">${regNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+      : '<div class="empty-state">No registered participants</div>';
+    waitTitle.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})`;
+    waitContainer.innerHTML = waitNames.length
+      ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
+      : '<div class="empty-state">No one on the waitlist</div>';
+  }
+
   const activityHtml = log.length ? log.map((l) => `
     <div class="row">
       <div class="row-main">
@@ -2212,20 +2320,6 @@ function updateModalContent(slotKey) {
   `).join('') : '<div class="empty-state" style="padding:28px 0; text-align:center;">No changes recorded for this event yet.</div>';
 
   document.getElementById('modalActivityList').innerHTML = activityHtml;
-
-  document.getElementById('modalRegTitle').innerHTML = `
-    <span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})
-  `;
-  document.getElementById('modalRegList').innerHTML = regNames.length
-    ? `<ol class="people-list">${regNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
-    : '<div class="empty-state">No registered participants</div>';
-
-  document.getElementById('modalWaitTitle').innerHTML = `
-    <span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})
-  `;
-  document.getElementById('modalWaitList').innerHTML = waitNames.length
-    ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${esc(n)}</li>`).join('')}</ol>`
-    : '<div class="empty-state">No one on the waitlist</div>';
 
   const searchInput = document.getElementById('modalSearchInput');
   if (searchInput && searchInput.value) {
@@ -2281,13 +2375,14 @@ function render(d) {
 }
 
 
-// ── Swipe handlers for Day view ──
+// ── Swipe handlers for all views ──
 function attachSwipeHandlers() {
-  const container = document.querySelector('.day-slots-wrapper') || document.querySelector('.day-view-container');
-  if (!container || container.dataset.swipeBound) return;
-  container.dataset.swipeBound = '1';
+  const container = document.getElementById('viewContainer');
+  if (!container || container.dataset.swipeBound === currentView) return;
+  container.dataset.swipeBound = currentView;
 
   let startX = 0, startY = 0, swiping = false;
+  const threshold = 60;
 
   container.addEventListener('touchstart', (e) => {
     if (e.target.closest('button') || e.target.closest('a') || e.target.closest('summary') || e.target.closest('input')) return;
@@ -2310,13 +2405,12 @@ function attachSwipeHandlers() {
     swiping = false;
     const dx = e.changedTouches[0].clientX - startX;
     const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
       if (dx > 0) {
-        selectedDate.setDate(selectedDate.getDate() - 1);
+        navPrev();
       } else {
-        selectedDate.setDate(selectedDate.getDate() + 1);
+        navNext();
       }
-      renderCurrentView();
     }
   });
 }
