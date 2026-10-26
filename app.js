@@ -204,24 +204,30 @@ function renderPerEventSections(s) {
     '</div>';
   }).join('');
 }
-// ── Registration window countdown ──
-function getDaysUntilRegOpens(dateStr) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const eventDate = new Date(y, m - 1, d);
+// ── Registration window countdown (uses event time, not just date) ──
+function regCountdown(s) {
+  const [y, m, d] = s.date.split('-').map(Number);
+  const [hh, mm] = (s.time || '0:00').split(':').map(Number);
+  const eventDate = new Date(y, m - 1, d, hh, mm);
   const regOpenDate = new Date(eventDate);
   regOpenDate.setDate(regOpenDate.getDate() - 14);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  regOpenDate.setHours(0, 0, 0, 0);
-  const diffMs = regOpenDate - today;
-  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-}
-
-function regCountdownHtml(dateStr) {
-  const days = getDaysUntilRegOpens(dateStr);
-  if (days <= 0) return '';
-  const label = days === 0 ? 'Opens today' : days === 1 ? 'Opens tomorrow' : `Opens in ${days} days`;
-  return `<span class="chip chip-countdown"><span class="material-symbols-outlined" style="font-size:13px;">lock_clock</span> ${label}</span>`;
+  const now = new Date();
+  const diffMs = regOpenDate - now;
+  if (diffMs <= 0) return { open: true, label: '' };
+  const totalHours = Math.ceil(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  let label;
+  if (days === 0) {
+    label = hours <= 1 ? 'Opens in 1h' : `Opens in ${hours}h`;
+  } else if (days === 1 && hours === 0) {
+    label = 'Opens tomorrow';
+  } else if (hours === 0) {
+    label = `Opens in ${days}d`;
+  } else {
+    label = `Opens in ${days}d ${hours}h`;
+  }
+  return { open: false, label };
 }
 
 function userStatusBadgeHtml(status) {
@@ -513,7 +519,7 @@ function renderWeekView(d) {
           : weekCap != null ? Math.max(0, weekCap - regNames.length) : null;
 
         const wStatus = userStatus(s);
-        const regOpen = getDaysUntilRegOpens(s.date) <= 0;
+        const regOpen = regCountdown(s).open;
 
         return `
           <div class="cal-event-card ${isLatest ? 'latest-card' : ''}">
@@ -526,7 +532,7 @@ function renderWeekView(d) {
                 ${wStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
                   : wStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
                   : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-                  : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
+                  : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${regCountdown(s).label}</span>`}
                 <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button>
                 ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
               </div>
@@ -645,7 +651,7 @@ function renderDayView(d) {
       const col2 = regNames.slice(half);
       const uStatus = userStatus(s);
       const userBadgeHtml = userStatusBadgeHtml(uStatus);
-      const regOpen = getDaysUntilRegOpens(s.date) <= 0;
+      const regOpen = regCountdown(s).open;
 
       let dayCap = null, dayRem = null;
       if (s.events) for (const e of s.events) {
@@ -687,7 +693,7 @@ function renderDayView(d) {
               ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
                 : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.7rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
                 : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:8px;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-                : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
+                : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${regCountdown(s).label}</span>`}
               <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button></span>
               <div class="day-slot-events">${eventLinks(s)}</div>
               <div class="badges-row">
@@ -780,7 +786,7 @@ function renderListView(d) {
     const relLabel = getRelativeDateLabel(s.date);
     const uStatus = userStatus(s);
     const userBadgeHtml = userStatusBadgeHtml(uStatus);
-    const regOpen = getDaysUntilRegOpens(s.date) <= 0;
+    const regOpen = regCountdown(s).open;
 
     let listCap = null, listRem = null;
     if (s.events) for (const e of s.events) {
@@ -808,7 +814,7 @@ function renderListView(d) {
           ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
             : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
             : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:6px;border-radius:6px;" title="Register on CourtReserve" onclick="event.stopPropagation();"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-            : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${getDaysUntilRegOpens(s.date) === 0 ? 'Opens today' : getDaysUntilRegOpens(s.date) === 1 ? 'Opens tomorrow' : `Opens ${getDaysUntilRegOpens(s.date)}d`}</span>`}
+            : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${regCountdown(s).label}</span>`}
           <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.preventDefault();event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button></span>
           <span class="material-symbols-outlined expand-icon">expand_more</span>
         </div>
