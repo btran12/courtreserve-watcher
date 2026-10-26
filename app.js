@@ -394,6 +394,10 @@ function renderWeekView(d) {
           .map(([n]) => n)
           .sort((a, b) => a.localeCompare(b));
 
+        const evData = (s.events && s.events[0]) || {};
+        const openSpots = evData.spotsRemaining != null ? evData.spotsRemaining
+          : evData.capacity != null ? Math.max(0, evData.capacity - regNames.length) : null;
+
         return `
           <div class="cal-event-card ${isLatest ? 'latest-card' : ''}">
             <div class="cal-event-header">
@@ -409,6 +413,7 @@ function renderWeekView(d) {
               <div class="cal-badges-row">
                 <span class="cal-badge cal-badge-reg"><span class="material-symbols-outlined" style="font-size:12px">group</span> ${regNames.length} reg</span>
                 <span class="cal-badge cal-badge-wait"><span class="material-symbols-outlined" style="font-size:12px">hourglass_empty</span> ${waitNames.length} wait</span>
+                ${openSpots != null ? (openSpots === 0 ? `<span class="cal-badge cal-badge-full"><span class="material-symbols-outlined" style="font-size:12px">block</span> Full</span>` : `<span class="cal-badge cal-badge-open"><span class="material-symbols-outlined" style="font-size:12px">event_available</span> ${openSpots} open</span>`) : ''}
               </div>
             </div>
 
@@ -521,6 +526,10 @@ function renderDayView(d) {
       const userBadgeHtml = userStatusBadgeHtml(uStatus);
       const countdownHtml = regCountdownHtml(s.date);
 
+      const evData = (s.events && s.events[0]) || {};
+      const dayOpenSpots = evData.spotsRemaining != null ? evData.spotsRemaining
+        : evData.capacity != null ? Math.max(0, evData.capacity - regNames.length) : null;
+
       const makeList = (items, startIdx, hlFn) => 
         `<ol class="people-list" start="${startIdx}">` +
         items.map((n) => `<li>${hlFn(n)}</li>`).join('') +
@@ -555,6 +564,7 @@ function renderDayView(d) {
               <div class="badges-row">
                 <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} registered</span>
                 <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
+                ${dayOpenSpots != null ? (dayOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span> FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${dayOpenSpots} open</span>`) : ''}
                 ${userBadgeHtml}
                 ${countdownHtml}
               </div>
@@ -645,6 +655,10 @@ function renderListView(d) {
     const userBadgeHtml = userStatusBadgeHtml(uStatus);
     const countdownHtml = regCountdownHtml(s.date);
 
+    const listEvData = (s.events && s.events[0]) || {};
+    const listOpenSpots = listEvData.spotsRemaining != null ? listEvData.spotsRemaining
+      : listEvData.capacity != null ? Math.max(0, listEvData.capacity - count(s, 'reg')) : null;
+
     const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
       `<div class="row">
         <div class="row-main">
@@ -667,6 +681,7 @@ function renderListView(d) {
           <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
           <span class="chip chip-reg">${count(s, 'reg')} registered</span>
           <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
+          ${listOpenSpots != null ? (listOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span> FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${listOpenSpots} open</span>`) : ''}
           ${userBadgeHtml}
           ${countdownHtml}
           ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}

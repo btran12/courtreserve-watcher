@@ -251,6 +251,8 @@
 
   .chip-reg { background: #e3f2fd; color: #1565c0; }
   .chip-wait { background: #fff3e0; color: #e65100; }
+  .chip-open { background: #e8f5e9; color: #2e7d32; }
+  .chip-full { background: #ffebee; color: #c62828; font-weight: 700; }
   .chip-latest { background: #fff8e1; color: #b78103; border: 1px solid #ffe082; font-weight: 700; }
   .chip-relative { background: #f3e5f5; color: #7b1fa2; font-weight: 600; }
 
@@ -463,7 +465,7 @@
 
   .calendar-week-grid {
     display: grid;
-    grid-template-columns: repeat(7, minmax(210px, 1fr));
+    grid-template-columns: repeat(7, minmax(250px, 1fr));
     gap: 12px;
     overflow-x: auto;
     padding-bottom: 12px;
@@ -620,6 +622,8 @@
 
   .cal-badge-reg { background: #e3f2fd; color: #1565c0; }
   .cal-badge-wait { background: #fff3e0; color: #e65100; }
+  .cal-badge-open { background: #e8f5e9; color: #2e7d32; }
+  .cal-badge-full { background: #ffebee; color: #c62828; font-weight: 700; }
   .cal-badge-latest { background: #fff8e1; color: #b78103; border: 1px solid #ffe082; }
 
   .cal-roster-section {

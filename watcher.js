@@ -73,6 +73,8 @@ function buildSlots(events, now) {
       name: clean(ev.EventName || ev.Title),
       signed: ev.SignedMembers || 0,
       wait: ev.WaitListCount || 0,
+      capacity: ev.Capacity || ev.MaxMembers || ev.MaxParticipants || ev.TotalSpots || ev.MaxCapacity || null,
+      spotsRemaining: ev.SpotsRemaining || ev.AvailableSpots || ev.OpenSpots || ev.SpotsAvailable || null,
     });
   }
   return [...slots.values()].sort((a, b) => a.key.localeCompare(b.key));
@@ -173,10 +175,56 @@ async function readParticipants(number) {
     return names;
   };
 
-  return {
-    reg: extractNames('registrants-table-body'),
-    wait: extractNames('waitlisted-table-body'),
-  };
+  const reg = extractNames('registrants-table-body');
+  const wait = extractNames('waitlisted-table-body');
+
+  // Extract capacity / spots from the detail page HTML
+  let capacity = null;
+  let spotsRemaining = null;
+
+  // Pattern 0: "FULL" or "Event Full" → no spots remaining
+  if (/\bfull\b/i.test(detailHtml)) {
+    spotsRemaining = 0;
+  }
+
+  // Pattern 1: "X of Y spots remaining" or "X / Y spots" → X=remaining, Y=capacity
+  const ofMatch = detailHtml.match(/(\d+)\s*(?:\/|of)\s*(\d+)\s*(?:spots?|spaces?)/i);
+  if (ofMatch) {
+    spotsRemaining = parseInt(ofMatch[1], 10);
+    capacity = parseInt(ofMatch[2], 10);
+  }
+
+  // Pattern 2: "X spots remaining" or "X spots left" or "X available"
+  if (spotsRemaining == null) {
+    const remMatch = detailHtml.match(/(?:spots?|spaces?)\s*(?:remaining|left|available)[^<>]*?(\d+)/i);
+    if (remMatch) spotsRemaining = parseInt(remMatch[1], 10);
+    else {
+      const remMatch2 = detailHtml.match(/(\d+)\s*(?:spots?|spaces?)\s*(?:remaining|left|available)/i);
+      if (remMatch2) spotsRemaining = parseInt(remMatch2[1], 10);
+    }
+  }
+
+  // Pattern 3: "Capacity: Y" or "Y total spots" or "Max: Y"
+  if (capacity == null) {
+    const capText = detailHtml.match(/(?:capacity|total spots|max members|max participants)[^<>]*?(\d+)/i);
+    if (capText) capacity = parseInt(capText[1], 10);
+  }
+
+  // Compute whichever is missing
+  if (capacity != null && spotsRemaining == null) {
+    spotsRemaining = Math.max(0, capacity - reg.length);
+  } else if (spotsRemaining != null && capacity == null) {
+    capacity = reg.length + spotsRemaining;
+  }
+
+  // Fallback: JSON-embedded data
+  if (capacity == null) {
+    const jsonMatch = detailHtml.match(/"(?:capacity|totalSpots|maxMembers|MaxCapacity)"\s*:\s*(\d+)/i);
+    if (jsonMatch) capacity = parseInt(jsonMatch[1], 10);
+    if (capacity != null) spotsRemaining = Math.max(0, capacity - reg.length);
+  }
+
+  return { reg, wait, capacity, spotsRemaining };
 }
 
 async function pool(items, n, fn) {
@@ -232,7 +280,7 @@ async function main() {
     if (failed.has(slot.key)) continue;
     const perEvent = targets.map((t, i) => ({ t, r: results[i] }))
       .filter(({ t }) => t.slot === slot)
-      .map(({ t, r }) => ({ eventName: t.ev.name, reg: r.reg, wait: r.wait }));
+      .map(({ t, r }) => ({ eventName: t.ev.name, reg: r.reg, wait: r.wait, capacity: r.capacity, spotsRemaining: r.spotsRemaining }));
     const people = mergePeople(perEvent);
     const prev = state.snapshots[slot.key];
     
@@ -242,7 +290,25 @@ async function main() {
     } else if (prev) {
       diffSlot(prev.people, people).forEach((c) => newLog.push({ ts, slot: slot.key, label: slotLabel(slot), ...c }));
     }
-    snapshots[slot.key] = { key: slot.key, date: slot.date, time: slot.time, events: slot.events.map((e) => ({ name: e.name, number: e.number })), people, updated: ts };
+    // Build per-event name map for snapshot
+    const perEventMap = {};
+    for (const pe of perEvent) {
+      perEventMap[pe.eventName] = { reg: pe.reg, wait: pe.wait, capacity: pe.capacity, spotsRemaining: pe.spotsRemaining };
+    }
+    snapshots[slot.key] = {
+      key: slot.key, date: slot.date, time: slot.time,
+      events: slot.events.map((e) => ({
+        name: e.name,
+        number: e.number,
+        signed: e.signed,
+        waitCount: e.wait,
+        capacity: (perEventMap[e.name] || {}).capacity != null ? perEventMap[e.name].capacity : e.capacity,
+        spotsRemaining: (perEventMap[e.name] || {}).spotsRemaining != null ? perEventMap[e.name].spotsRemaining : e.spotsRemaining,
+        reg: (perEventMap[e.name] || {}).reg || [],
+        wait: (perEventMap[e.name] || {}).wait || [],
+      })),
+      people, updated: ts
+    };
   }
 
   state.snapshots = snapshots;
