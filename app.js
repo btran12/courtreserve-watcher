@@ -286,6 +286,76 @@ function eventUrl(keyOrNumber) {
   return `https://app.courtreserve.com/Online/Events/Details/17397/${keyOrNumber}`;
 }
 
+// ── Open court availability (state.courts, produced by the Lambda) ──
+const COURTS_URL = 'https://app.courtreserve.com/Online/Reservations/Bookings/17397?sId=22028';
+const toMinutes = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const fromMinutes = (n) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
+const fmtRange = (s, e) => `${fmtTime(s)}–${fmtTime(e)}`;
+const shortCourtName = (name) => name.replace(/^pickleball\s+/i, '');
+
+function courtDay(d, dateStr) {
+  const day = d.courts && d.courts.days && d.courts.days[dateStr];
+  return day && day.free ? day : null;
+}
+
+// Windows where at least one court is free, with how many courts are free in each.
+function mergedCourtWindows(free) {
+  const lists = Object.values(free);
+  const points = [...new Set(lists.flat().flat().map(toMinutes))].sort((a, b) => a - b);
+  const out = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const [s, e] = [points[i], points[i + 1]];
+    const n = lists.filter((w) => w.some(([fs, fe]) => toMinutes(fs) <= s && toMinutes(fe) >= e)).length;
+    const last = out[out.length - 1];
+    if (!n) continue;
+    if (last && last.n === n && last.e === s) last.e = e;
+    else out.push({ s, e, n });
+  }
+  return out.map((w) => ({ start: fromMinutes(w.s), end: fromMinutes(w.e), courts: w.n }));
+}
+
+function renderCourtsDay(d, dateStr) {
+  const day = courtDay(d, dateStr);
+  if (!day) return '';
+  const courts = d.courts.list && d.courts.list.length
+    ? d.courts.list
+    : Object.keys(day.free).map((id) => ({ id, name: `Court ${id}` }));
+  const rows = courts.map((c) => {
+    const free = day.free[c.id] || [];
+    return `
+      <div class="court-row">
+        <span class="court-name">${esc(shortCourtName(c.name))}</span>
+        <span class="court-windows">${free.length
+          ? free.map(([s, e]) => `<span class="chip chip-open">${fmtRange(s, e)}</span>`).join('')
+          : '<span class="chip chip-full">Fully booked</span>'}</span>
+      </div>`;
+  }).join('');
+  return `
+    <div class="box-container">
+      <div class="box-title">
+        <span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">sports_tennis</span>
+        <a href="${COURTS_URL}" target="_blank" rel="noopener" style="color:inherit;">Open Courts</a>
+        <span class="court-updated">updated ${new Date(day.updated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+      </div>
+      ${rows}
+    </div>`;
+}
+
+function renderCourtsWeekCol(d, dateStr) {
+  const day = courtDay(d, dateStr);
+  if (!day) return '';
+  const windows = mergedCourtWindows(day.free);
+  return `
+    <div class="cal-roster-section">
+      <div class="cal-roster-title">
+        <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">sports_tennis</span> Open courts</span>
+      </div>
+      ${windows.length
+        ? `<ul class="court-week-list">${windows.map((w) => `<li>${fmtRange(w.start, w.end)} <span class="court-count">${w.courts} ${w.courts === 1 ? 'court' : 'courts'}</span></li>`).join('')}</ul>`
+        : '<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">Fully booked</div>'}
+    </div>`;
+}
+
 // ── Event data helpers (events are now {name, number} objects) ──
 function eventNames(snapshot) {
   return (snapshot.events || []).map(e => typeof e === 'string' ? e : e.name);
@@ -621,6 +691,7 @@ function renderWeekView(d) {
         </div>
         <div class="week-col-content">
           ${contentHtml}
+          ${renderCourtsWeekCol(d, dateStr)}
         </div>
       </div>
     `;
@@ -786,6 +857,7 @@ function renderDayView(d) {
       <div class="day-ribbon">
         ${ribbonHtml}
       </div>
+      ${renderCourtsDay(d, selectedDateStr)}
       ${slotsHtml}
     </div>
   `;

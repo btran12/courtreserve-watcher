@@ -13,6 +13,8 @@ const CONFIG = {
   weeksAhead: 3,
   maxLogEntries: 3000,
   concurrency: 3,
+  courtSchedulerId: '22028', // sId from /Online/Reservations/Bookings/{orgId}?sId=...
+  timeZone: 'America/New_York',
 };
 
 const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
@@ -225,6 +227,132 @@ async function pool(items, n, fn) {
   return out;
 }
 
+const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+
+function addDays(dateStr, n) {
+  const d = new Date(`${dateStr}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// UTC instant of local midnight for dateStr in tz (what the browser sends as startDate).
+function zonedMidnight(dateStr, tz) {
+  const guess = new Date(`${dateStr}T00:00:00Z`);
+  const p = zonedParts(guess, tz);
+  const [y, m, d] = p.dateStr.split('-').map(Number);
+  const offset = Date.UTC(y, m - 1, d, p.hour, p.minute) - guess.getTime();
+  return new Date(guess.getTime() - offset);
+}
+
+// The Bookings page (requested as XHR) still serves the legacy Kendo scheduler, which embeds
+// the public data URL (with an anonymous RequestData token), the court list, and the visible hours.
+async function readCourtScheduler() {
+  const pageUrl = `https://app.courtreserve.com/Online/Reservations/Bookings/${CONFIG.orgId}?sId=${CONFIG.courtSchedulerId}`;
+  const r = await fetch(pageUrl, { headers: { 'User-Agent': DEFAULT_UA, 'X-Requested-With': 'XMLHttpRequest' } });
+  if (!r.ok) throw new Error(`bookings HTTP ${r.status}`);
+  const html = await r.text();
+  const readUrl = /"read":\{"url":"([^"]*\/api\/scheduler\/member-expanded[^"]*)"[^}]*?"headers":\{"Authorization":"([^"]*)"/.exec(html)
+    || /"read":\{"url":"([^"]*\/api\/scheduler\/member-expanded[^"]*)"/.exec(html);
+  if (!readUrl) throw new Error('bookings: scheduler read url not found');
+  const opt = (name) => (new RegExp(`${name}:\\s*'([^']*)'`).exec(html) || [])[1] || '';
+  const tick = (name) => {
+    const m = new RegExp(`"${name}":new Date\\(\\d+,\\d+,\\d+,(\\d+),(\\d+)`).exec(html);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const courts = [...html.matchAll(/data-courtid=(\d+)[^"]*","Value":"([^"]*)"/g)]
+    .map((m) => ({ id: m[1], name: clean(m[2]) }));
+  return {
+    readUrl: readUrl[1],
+    authorization: readUrl[2] || '',
+    costTypeId: opt('CostTypeId'),
+    courtIds: opt('SelectedCourtIds'),
+    minInterval: Number(opt('ReservationMinInterval')) || 30,
+    open: tick('startTime') ?? 0,
+    close: tick('endTime') ?? 24 * 60,
+    courts,
+  };
+}
+
+async function readCourtDay(sched, dateStr) {
+  const start = zonedMidnight(dateStr, CONFIG.timeZone);
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const criteria = {
+    startDate: start.toISOString(), orgId: CONFIG.orgId, TimeZone: CONFIG.timeZone,
+    Date: start.toUTCString(), KendoDate: { Year: y, Month: m, Day: d }, UiCulture: 'en-US',
+    CostTypeId: sched.costTypeId, CustomSchedulerId: CONFIG.courtSchedulerId,
+    ReservationMinInterval: String(sched.minInterval), SelectedCourtIds: sched.courtIds,
+    SelectedInstructorIds: '', MemberIds: '', MemberFamilyId: '', EmbedCodeId: '',
+    HideEmbedCodeReservationDetails: 'True',
+  };
+  const url = new URL(sched.readUrl);
+  url.searchParams.set('jsonData', JSON.stringify(criteria));
+  const r = await fetch(url, {
+    headers: {
+      'User-Agent': DEFAULT_UA,
+      'X-Requested-With': 'XMLHttpRequest',
+      ...(sched.authorization ? { Authorization: sched.authorization } : {}),
+    },
+  });
+  if (!r.ok) throw new Error(`scheduler HTTP ${r.status}`);
+  const j = await r.json();
+  return j.Data || [];
+}
+
+// Free [start, end] windows per court for one day, as 'HH:MM' pairs.
+function courtFreeWindows(sched, items, dateStr, fromMin) {
+  const toMin = (s) => {
+    if (!s) return null;
+    if (s.slice(0, 10) < dateStr) return 0;
+    if (s.slice(0, 10) > dateStr) return 24 * 60;
+    return Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
+  };
+  const busy = {};
+  sched.courts.forEach((c) => { busy[c.id] = []; });
+  for (const it of items) {
+    if (it.IsCanceled) continue;
+    const s = toMin(it.ReservationStart);
+    const e = toMin(it.ReservationEnd);
+    if (s == null || e == null || e <= s) continue;
+    const ids = it.CourtId && !it.IsOrgClosed ? [String(it.CourtId)] : Object.keys(busy);
+    ids.forEach((id) => { if (busy[id]) busy[id].push([s, e]); });
+  }
+  const open = Math.max(sched.open, fromMin);
+  const out = {};
+  for (const [id, blocks] of Object.entries(busy)) {
+    blocks.sort((a, b) => a[0] - b[0]);
+    const free = [];
+    let t = open;
+    for (const [s, e] of blocks) {
+      if (s > t) free.push([t, Math.min(s, sched.close)]);
+      t = Math.max(t, e);
+      if (t >= sched.close) break;
+    }
+    if (t < sched.close) free.push([t, sched.close]);
+    out[id] = free.filter(([s, e]) => e - s >= sched.minInterval).map(([s, e]) => [hhmm(s), hhmm(e)]);
+  }
+  return out;
+}
+
+async function readCourts(prev, todayStr, nowMin) {
+  const sched = await readCourtScheduler();
+  const dates = Array.from({ length: CONFIG.weeksAhead * 7 }, (_, i) => addDays(todayStr, i));
+  const results = await pool(dates, CONFIG.concurrency, async (date) => {
+    try {
+      return courtFreeWindows(sched, await readCourtDay(sched, date), date, date === todayStr ? nowMin : 0);
+    } catch (e) {
+      console.error(`Failed to read court availability for ${date}:`, e.message);
+      return null;
+    }
+  });
+  const days = {};
+  dates.forEach((date, i) => {
+    const prevDay = prev && prev.days && prev.days[date];
+    if (results[i]) days[date] = { free: results[i], updated: Date.now() };
+    else if (prevDay) days[date] = prevDay;
+  });
+  return { open: hhmm(sched.open), close: hhmm(sched.close), minInterval: sched.minInterval, list: sched.courts, days };
+}
+
 export const handler = async () => {
   let state = { snapshots: {}, log: [], initialized: false };
   
@@ -304,6 +432,11 @@ export const handler = async () => {
   }
 
   state.snapshots = snapshots;
+  try {
+    state.courts = await readCourts(state.courts, nyParts.dateStr, nyParts.minutes);
+  } catch (e) {
+    console.error('Failed to read court availability:', e.message);
+  }
   state.log = newLog.reverse().concat(state.log || []).slice(0, CONFIG.maxLogEntries);
   state.lastRun = ts;
   state.updated = ts;

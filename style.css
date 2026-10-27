@@ -678,6 +678,49 @@
     padding: 40px 8px;
   }
 
+  /* Open court availability */
+  .court-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 4px 0;
+    border-top: 1px dashed var(--md-outline);
+  }
+
+  .box-title + .court-row { border-top: none; }
+
+  .court-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 72px;
+    flex-shrink: 0;
+  }
+
+  .court-windows {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .court-updated {
+    margin-left: auto;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 0.7rem;
+  }
+
+  .court-week-list {
+    margin: 0;
+    padding-left: 16px;
+    font-size: 0.75rem;
+  }
+
+  .court-count {
+    color: #2e7d32;
+    font-weight: 600;
+  }
+
   /* Day View */
   .day-view-container {
     display: flex;
