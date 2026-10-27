@@ -136,26 +136,16 @@ async function readWeek(startLocal) {
 }
 
 async function readParticipants(number) {
-  const pageUrl = `https://app.courtreserve.com/Online/Events/Details/${CONFIG.orgId}/${encodeURIComponent(number)}`;
-  const page = await fetch(pageUrl, {
-    headers: { 'User-Agent': DEFAULT_UA }
-  });
-  if (!page.ok) throw new Error(`details HTTP ${page.status}`);
-  const htmlText = await page.text();
-  const m = /fixUrl\('([^']*EventsApi\/ApiDetails[^']*)'\)/.exec(htmlText);
-  if (!m) throw new Error('details: ApiDetails url not found');
-  
-  const rawCookies = page.headers.raw ? (page.headers.raw()['set-cookie'] || []) : [];
-  const cookies = rawCookies.map((c) => c.split(';')[0]).join('; ');
-  const apiUri = new URL(m[1].replace(/&amp;/g, '&'), 'https://app.courtreserve.com');
-  apiUri.searchParams.set('modalHtml', '""');
-  
+  // The Events/Details page is now a React SPA shell; call the details API it uses directly.
+  const apiUri = new URL('https://app.courtreserve.com/Online/EventsApi/ApiDetails');
+  apiUri.searchParams.set('id', CONFIG.orgId);
+  apiUri.searchParams.set('number', number);
+  apiUri.searchParams.set('ajaxCall', 'true');
+
   const r = await fetch(apiUri.toString(), {
     headers: {
       'User-Agent': DEFAULT_UA,
       'X-Requested-With': 'XMLHttpRequest',
-      'Referer': pageUrl,
-      ...(cookies ? { Cookie: cookies } : {})
     }
   });
   if (!r.ok) throw new Error(`ApiDetails HTTP ${r.status}`);
