@@ -141,11 +141,20 @@ async function readParticipants(number) {
   apiUri.searchParams.set('id', CONFIG.orgId);
   apiUri.searchParams.set('number', number);
   apiUri.searchParams.set('ajaxCall', 'true');
-
+  console.log(`${apiUri.toString()}`)
   const r = await fetch(apiUri.toString(), {
     headers: {
       'User-Agent': DEFAULT_UA,
       'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Referer': `https://app.courtreserve.com/Online/Events/Details/${CONFIG.orgId}?number=${number}`,
+      'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Dest': 'empty',
+      'Sec-Fetch-Mode': 'cors',
+      'Sec-Fetch-Site': 'same-origin',
     }
   });
   if (!r.ok) throw new Error(`ApiDetails HTTP ${r.status}`);
@@ -154,7 +163,10 @@ async function readParticipants(number) {
   const extractNames = (sectionTestId) => {
     const tableRegex = new RegExp(`data-testid="${sectionTestId}"[\\s\\S]*?<\\/tbody>`, 'i');
     const match = tableRegex.exec(detailHtml);
-    if (!match) return [];
+    if (!match) {
+      console.log(`[DEBUG] Table testid "${sectionTestId}" not found in HTML`);
+      return [];
+    }
     const rowRegex = /<th[^>]*scope="row"[^>]*>([\s\S]*?)<\/th>/gi;
     const names = [];
     let rMatch;
