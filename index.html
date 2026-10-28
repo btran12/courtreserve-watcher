@@ -47,7 +47,24 @@
 </main>
 
 <script src="app.js" defer></script>
-<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js')</script>
+<script>
+if ('serviceWorker' in navigator) {
+  // Only reload when this page was already running under a worker: on a first visit the page
+  // starts uncontrolled, and claiming it would otherwise trigger a pointless reload.
+  const controlledOnLoad = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!controlledOnLoad || window.__swReloading) return;
+    window.__swReloading = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    // updateViaCache:'none' keeps sw.js itself out of the HTTP cache; update() forces a check.
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update())
+      .catch(() => {});
+  });
+}
+</script>
 
 <!-- Name prompt overlay -->
 <div id="namePrompt" class="prompt-overlay">
