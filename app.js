@@ -793,8 +793,8 @@ function renderDayView(d) {
       const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
         `<div class="row">
           <div class="row-main">
-            <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
-            <b>${esc(l.name)}</b>
+            <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} </span>
+            <b>${esc(l.name)} </b> <span class="action-type">- ${esc(TEXT[l.type] || l.type)}</span>
           </div>
           <div class="time">${new Date(l.ts).toLocaleString()}</div>
         </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
