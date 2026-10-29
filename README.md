@@ -54,7 +54,7 @@ It tracks evening events (Monday, Wednesday, Friday after 7:00 PM), monitors reg
    - ⬆️ **Promoted** (Moved from waitlist to registered)
    - ⬇️ **Demoted** (Moved from registered to waitlist)
 6. **Upload**: It uploads the refreshed state and change logs back to the AWS Lambda endpoint using a secure header token.
-7. **Open Courts** (AWS Lambda, `aws/index.mjs`): Each run also reads the public court scheduler (`/Online/Reservations/Bookings/17397?sId=22028`) for every day in the scan window and stores each court's free time windows in `state.courts`. The viewer shows them in the Day view (per court) and Week view (combined, with number of free courts).
+7. **Open Courts** (AWS Lambda, `aws/index.mjs`): Each run reads the booking scheduler for the next 7 days (`CONFIG.courtDaysAhead`) and stores each court's free time windows in `state.courts`. It uses the same feed the CourtReserve booking page renders (`GET /Online/Reservations/ReadConsolidated/{orgId}` with the `X-Requested-By: ReactApp` header), which returns, per slot, the courts that are still bookable. That feed already excludes public events **and other members' reservations** ("Reserved" blocks) and court closures — unlike the older `/api/scheduler/member-expanded` endpoint, which only returns public events to anonymous callers and therefore over-reported free time. Opening hours, courts and the reservation interval come from the scheduler model (`/Online/Reservations/Bookings/{orgId}?sId=...` requested as JSON). The viewer shows the windows in the Day view (per court) and Week view (combined, with number of free courts).
 
 ---
 
