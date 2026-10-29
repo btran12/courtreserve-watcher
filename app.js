@@ -107,16 +107,64 @@ function ensureToastContainer() {
   document.body.appendChild(el);
 }
 
-function showToast(t) {
+// Toasts are sticky: they stay until the reader dismisses them (or clears them all).
+// A long-lived tab could otherwise pile them up, so the stack is capped.
+const MAX_TOASTS = 6;
+
+function dismissToast(el) {
+  if (!el || el.classList.contains('dismissing')) return;
+  el.classList.add('dismissing');
+  setTimeout(() => {
+    el.remove();
+    syncToastContainer();
+  }, 250);
+}
+
+function clearToasts() {
   const container = document.getElementById('toastContainer');
   if (!container) return;
+  container.querySelectorAll('.toast').forEach(dismissToast);
+}
+
+// Drops the container once empty and only shows "clear all" when more than one toast is up.
+function syncToastContainer() {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const n = container.querySelectorAll('.toast:not(.dismissing)').length;
+  if (!n) { container.remove(); return; }
+  const bulk = container.querySelector('.toast-clear-all');
+  if (bulk) bulk.classList.toggle('visible', n > 1);
+}
+
+function showToast(t) {
+  // The container is torn down once the last toast is dismissed, so recreate on demand.
+  ensureToastContainer();
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+
+  if (!container.querySelector('.toast-clear-all')) {
+    const bulk = document.createElement('button');
+    bulk.type = 'button';
+    bulk.className = 'toast-clear-all';
+    bulk.innerHTML = '<span class="material-symbols-outlined">delete_sweep</span> Clear all';
+    bulk.onclick = (e) => { e.stopPropagation(); clearToasts(); };
+    container.appendChild(bulk);
+  }
+
   const el = document.createElement('div');
   el.className = `toast ${t.type}`;
   el.innerHTML = `<span class="toast-icon material-symbols-outlined" style="color:${t.type === 'spot-open' ? '#2e7d32' : '#1976d2'}">${t.type === 'spot-open' ? 'event_available' : 'campaign'}</span>
-    <div class="toast-body"><div class="toast-title">${t.title}</div><div class="toast-detail">${t.detail}</div></div>`;
-  el.onclick = () => { el.classList.add('dismissing'); setTimeout(() => el.remove(), 250); };
+    <div class="toast-body"><div class="toast-title">${t.title}</div><div class="toast-detail">${t.detail}</div></div>
+    <button type="button" class="toast-close" aria-label="Dismiss notification" title="Dismiss">
+      <span class="material-symbols-outlined">close</span>
+    </button>`;
+  el.querySelector('.toast-close').onclick = (e) => { e.stopPropagation(); dismissToast(el); };
+  el.onclick = () => dismissToast(el);
   container.appendChild(el);
-  setTimeout(() => { if (el.parentNode) { el.classList.add('dismissing'); setTimeout(() => el.remove(), 250); } }, 6000);
+
+  const shown = [...container.querySelectorAll('.toast')];
+  if (shown.length > MAX_TOASTS) shown.slice(0, shown.length - MAX_TOASTS).forEach(dismissToast);
+  syncToastContainer();
 }
 
 // ── User name ──
