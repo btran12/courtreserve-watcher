@@ -330,14 +330,24 @@ function renderCourtsDay(d, dateStr) {
           : '<span class="chip chip-full">Fully booked</span>'}</span>
       </div>`;
   }).join('');
+  const updated = day.updated
+    ? new Date(day.updated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : '';
   return `
-    <div class="box-container">
+    <div class="box-container courts-panel" role="button" tabindex="0"
+         aria-label="Open the court availability timeline for ${esc(dateStr)}"
+         onclick="openCourtsModal('${dateStr}')"
+         onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCourtsModal('${dateStr}'); }">
       <div class="box-title">
         <span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">sports_tennis</span>
-        <a href="${COURTS_URL}" target="_blank" rel="noopener" style="color:inherit;">Open Courts</a>
-        <span class="court-updated">updated ${new Date(day.updated).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+        <a href="${COURTS_URL}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;">Open Courts</a>
+        <span class="court-updated">${updated ? `updated ${updated}` : ''}</span>
       </div>
       ${rows}
+      <div class="courts-more">
+        <span class="material-symbols-outlined" style="font-size:14px">open_in_full</span>
+        Tap for the full timeline
+      </div>
     </div>`;
 }
 
@@ -354,6 +364,153 @@ function renderCourtsWeekCol(d, dateStr) {
         ? `<ul class="court-week-list">${windows.map((w) => `<li>${fmtRange(w.start, w.end)} <span class="court-count">${w.courts} ${w.courts === 1 ? 'court' : 'courts'}</span></li>`).join('')}</ul>`
         : '<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">Fully booked</div>'}
     </div>`;
+}
+
+// ── Court availability timeline modal ──
+// The panel above only lists free windows as chips; tapping it opens a scrollable
+// column-per-court timeline (like the CourtReserve scheduler) so booked vs. open
+// stretches are obvious at a glance.
+const COURT_PX_PER_MIN = 1.15;
+let courtsModalDate = null;
+
+// Current wall-clock time in the venue's timezone (all court data is America/New_York).
+function etNow() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const o = {};
+  parts.forEach((p) => { o[p.type] = p.value; });
+  const h = Number(o.hour) % 24;
+  return { dateStr: `${o.year}-${o.month}-${o.day}`, minutes: h * 60 + Number(o.minute) };
+}
+
+// 420 -> '7am', 1230 -> '8:30pm'
+function clockLabel(min) {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${((h + 11) % 12) + 1}${m ? ':' + String(m).padStart(2, '0') : ''}${h >= 12 ? 'pm' : 'am'}`;
+}
+
+// Alternating booked/open blocks for one court, clamped to the venue's opening hours.
+function courtSegments(day, courtId, openMin, closeMin) {
+  const free = (day.free[courtId] || [])
+    .map(([s, e]) => [Math.max(openMin, toMinutes(s)), Math.min(closeMin, toMinutes(e))])
+    .filter(([s, e]) => e > s)
+    .sort((a, b) => a[0] - b[0]);
+  const segs = [];
+  let t = openMin;
+  for (const [s, e] of free) {
+    if (s > t) segs.push({ s: t, e: s, free: false });
+    if (e > t) segs.push({ s: Math.max(s, t), e, free: true });
+    t = Math.max(t, e);
+  }
+  if (t < closeMin) segs.push({ s: t, e: closeMin, free: false });
+  return segs.filter((x) => x.e > x.s);
+}
+
+function openCourtsModal(dateStr) {
+  courtsModalDate = dateStr;
+  renderCourtsModal();
+}
+
+function closeCourtsModal() {
+  courtsModalDate = null;
+  const overlay = document.getElementById('courtsModal');
+  if (overlay) overlay.classList.remove('open');
+  document.body.classList.remove('modal-open');
+}
+
+function renderCourtsModal() {
+  const overlay = document.getElementById('courtsModal');
+  const body = document.getElementById('courtsModalBody');
+  const sub = document.getElementById('courtsModalSub');
+  if (!overlay || !body) return;
+
+  const d = currentData;
+  const day = d && d.courts ? courtDay(d, courtsModalDate) : null;
+  if (!day) { closeCourtsModal(); return; }
+
+  const openMin = Math.max(0, toMinutes(d.courts.open || '06:00'));
+  const closeMin = Math.min(24 * 60, toMinutes(d.courts.close || '22:00')) || 24 * 60;
+  const span = Math.max(60, closeMin - openMin);
+  const px = COURT_PX_PER_MIN;
+  const totalH = Math.round(span * px);
+  const slotH = Math.max(1, Number(d.courts.minInterval) || 30) * px;
+
+  const courts = d.courts.list && d.courts.list.length
+    ? d.courts.list
+    : Object.keys(day.free).map((id) => ({ id, name: `Court ${id}` }));
+
+  const dateLabel = new Date(`${courtsModalDate}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'long', month: 'short', day: 'numeric',
+  });
+  if (sub) {
+    sub.textContent = `${dateLabel} · ${clockLabel(openMin)}–${clockLabel(closeMin)} · `
+      + `${Number(d.courts.minInterval) || 30} min blocks`;
+  }
+
+  // Hourly ruler
+  const tickStep = span > 420 ? 60 : 30;
+  let ticks = '';
+  for (let m = Math.ceil(openMin / tickStep) * tickStep; m <= closeMin; m += tickStep) {
+    const pos = Math.round((m - openMin) * px);
+    const edge = pos === 0 ? ' first' : m === closeMin ? ' last' : '';
+    ticks += `<div class="court-tick${edge}" style="top:${pos}px"><span>${clockLabel(m)}</span></div>`;
+  }
+
+  // "Now" marker, only for today in venue time
+  const nowEt = etNow();
+  const nowTop = courtsModalDate === nowEt.dateStr && nowEt.minutes >= openMin && nowEt.minutes <= closeMin
+    ? Math.round((nowEt.minutes - openMin) * px)
+    : null;
+
+  const heads = courts.map((c) => {
+    const freeMin = courtSegments(day, c.id, openMin, closeMin)
+      .filter((s) => s.free)
+      .reduce((a, s) => a + (s.e - s.s), 0);
+    const hrs = freeMin / 60;
+    const meta = freeMin ? `${hrs % 1 === 0 ? hrs : hrs.toFixed(1)}h open` : 'Fully booked';
+    return `
+      <div class="cg-head">
+        <span class="cg-head-name" title="${esc(c.name)}">${esc(shortCourtName(c.name))}</span>
+        <span class="cg-head-meta${freeMin ? '' : ' none'}">${meta}</span>
+      </div>`;
+  }).join('');
+
+  const cols = courts.map((c) => {
+    const segs = courtSegments(day, c.id, openMin, closeMin);
+    const segHtml = segs.map(({ s, e, free }) => {
+      const h = Math.round((e - s) * px);
+      const label = `${clockLabel(s)}–${clockLabel(e)}`;
+      const showText = h >= 26;
+      const tall = h > 190 ? ' tall' : '';
+      return `<div class="court-seg ${free ? 'free' : 'booked'}${tall}" style="top:${Math.round((s - openMin) * px)}px;height:${h}px" title="${free ? 'Open' : 'Booked'} ${label}">${
+        showText ? `<span class="seg-time">${label}</span>` : ''
+      }${showText && free && h >= 34 ? '<span class="seg-tag">open</span>' : ''}</div>`;
+    }).join('');
+    const marker = nowTop != null ? `<div class="court-now-line" style="top:${nowTop}px"></div>` : '';
+    return `<div class="cg-col" style="height:${totalH}px">${segHtml}${marker}</div>`;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="courts-grid" style="--court-cols:${courts.length};--slot-h:${slotH}px">
+      <div class="cg-corner"></div>
+      ${heads}
+      <div class="cg-ruler" style="height:${totalH}px">${ticks}</div>
+      ${cols}
+    </div>`;
+
+  overlay.classList.add('open');
+  document.body.classList.add('modal-open');
+  // Auto-scroll so "now" sits near the top of the viewport instead of the start of the day.
+  // Deferred one frame so the freshly rendered grid has a real clientHeight.
+  if (nowTop != null) {
+    requestAnimationFrame(() => {
+      body.scrollTop = Math.max(0, nowTop - body.clientHeight / 3);
+    });
+  }
 }
 
 // ── Event data helpers (events are now {name, number} objects) ──
@@ -453,6 +610,7 @@ function initDateIfNeeded(data) {
 function setView(view) {
   currentView = view;
   localStorage.setItem('crw_view', view);
+  closeCourtsModal();
   syncUrl();
   renderCurrentView();
   // Attach swipe handlers when entering day view
@@ -1065,6 +1223,12 @@ function render(d) {
   initDateIfNeeded(d);
   renderCurrentView();
 
+  // Keep an open court timeline in sync with refreshed data (poll reloads every 60s)
+  if (courtsModalDate) {
+    if (currentView === 'day') renderCourtsModal();
+    else closeCourtsModal();
+  }
+
   checkWatchedChanges(d);
 
   const updatedTs = d.updated || d.lastRun || d.uploadedAt;
@@ -1139,6 +1303,7 @@ document.getElementById('app').addEventListener('toggle', (e) => {
 }, true);
 
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && courtsModalDate) closeCourtsModal(); });
 setInterval(load, 60000);
 load();
 showNamePrompt();

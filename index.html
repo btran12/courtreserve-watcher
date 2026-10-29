@@ -66,6 +66,30 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
+<!-- Court availability timeline modal -->
+<div id="courtsModal" class="courts-modal-overlay" onclick="if (event.target === this) closeCourtsModal()">
+  <div class="courts-modal" role="dialog" aria-modal="true" aria-labelledby="courtsModalTitle">
+    <div class="courts-modal-head">
+      <div class="courts-modal-heading">
+        <h2 id="courtsModalTitle">Court availability</h2>
+        <span id="courtsModalSub" class="courts-modal-sub"></span>
+      </div>
+      <button type="button" class="courts-modal-close" onclick="closeCourtsModal()" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="courts-modal-legend">
+      <span class="cl-item"><span class="cl-swatch free"></span> Open</span>
+      <span class="cl-item"><span class="cl-swatch booked"></span> Booked</span>
+      <span class="cl-item"><span class="cl-swatch now"></span> Now</span>
+      <a class="cl-link" href="https://app.courtreserve.com/Online/Reservations/Bookings/17397?sId=22028" target="_blank" rel="noopener">
+        <span class="material-symbols-outlined" style="font-size:13px">open_in_new</span> Book on CourtReserve
+      </a>
+    </div>
+    <div id="courtsModalBody" class="courts-modal-body"></div>
+  </div>
+</div>
+
 <!-- Name prompt overlay -->
 <div id="namePrompt" class="prompt-overlay">
   <div class="prompt-card">
