@@ -1195,14 +1195,17 @@ function renderListView(d) {
     return cardHtml;
   }).join('') || '<div class="card" style="padding:16px;">No tracked events found.</div>';
 
-  const full = log.slice(0, 300).map((l) =>
-    `<div class="row">
+  const full = log.slice(0, 300).map((l) => {
+    const when = new Date(l.ts).toLocaleString();
+    const meta = [when, l.label, l.ev].filter(Boolean).join(' \u00b7 ');
+    return `<div class="row">
       <div class="row-main">
         <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
         <b>${esc(l.name)}</b>
       </div>
-      <div class="time">${esc(l.label)} \u00b7 ${esc(l.ev)} \u00b7 ${new Date(l.ts).toLocaleString()}</div>
-    </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes recorded yet.</div>';
+      <div class="time" title="${esc(meta)}">${esc(meta)}</div>
+    </div>`;
+  }).join('') || '<div class="empty-state" style="padding:8px 0;">No changes recorded yet.</div>';
 
   return `
     <div class="section-title"><span class="material-symbols-outlined">event_upcoming</span> Tracked Events</div>
@@ -1222,22 +1225,33 @@ function renderActivityView(d) {
     </div></div>`;
   }
 
-  const rows = log.map((l) => `
+  // Short verbs keep the compact activity rows on one line (the icon carries the direction).
+  const SHORT = {
+    'waitlist-joined': 'waitlist',
+    'waitlist-left': 'left waitlist',
+    promoted: 'promoted',
+    demoted: 'demoted',
+    removed: 'unlisted',
+  };
+
+  const rows = log.map((l) => {
+    const tone = cls(l.type) === 'j' ? '#2e7d32' : cls(l.type) === 'l' ? '#c62828' : '#ed6c02';
+    const meta = [l.ev, l.label].filter(Boolean).join(' \u00b7 ');
+    return `
     <div class="activity-log-row">
-      <span class="act-icon material-symbols-outlined" style="color:${cls(l.type) === 'j' ? '#2e7d32' : cls(l.type) === 'l' ? '#c62828' : '#ed6c02'}; font-size:20px;">
-        ${ICON[l.type] || 'info'}
-      </span>
-      <div class="act-body">
-        <div class="act-name">${highlightName(l.name)} <span class="action-chip ${cls(l.type)}" style="font-size:0.72rem;">${esc(TEXT[l.type] || l.type)}</span></div>
-        <div class="act-meta">${esc(l.ev)} · ${esc(l.label || '')} · ${new Date(l.ts).toLocaleString()}</div>
-      </div>
+      <span class="act-icon material-symbols-outlined" style="color:${tone}">${ICON[l.type] || 'info'}</span>
+      <span class="act-name">${highlightName(l.name)}</span>
+      <span class="action-chip ${cls(l.type)}">${esc(SHORT[l.type] || TEXT[l.type] || l.type)}</span>
+      <span class="act-meta" title="${esc(meta)}">${esc(meta)}</span>
+      <span class="act-time">${new Date(l.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   return `
     <div class="section-title"><span class="material-symbols-outlined">history</span> Recent Activity (Last ${log.length} changes)</div>
     <div class="activity-view-container">
-      ${rows}
+      <div class="activity-log-card">${rows}</div>
     </div>
   `;
 }

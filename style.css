@@ -316,35 +316,37 @@
     background: var(--md-surface);
     border-radius: var(--radius-card);
     border: 1px solid var(--md-outline);
-    padding: 8px 16px;
+    padding: 6px 14px;
     box-shadow: var(--shadow-1);
   }
 
   .row {
-    padding: 8px 0;
+    padding: 5px 0;
     border-bottom: 1px solid #f0f0f0;
     display: flex;
-    flex-direction: column;
-    gap: 2px;
+    align-items: baseline;
+    gap: 10px;
   }
 
   .row:last-child { border-bottom: none; }
 
   .row-main {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 0.85rem;
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .action-chip {
-    padding: 2px 6px;
+    padding: 1px 5px;
     border-radius: 4px;
     font-weight: 500;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.8rem;
+    gap: 3px;
+    font-size: 0.74rem;
   }
 
   .j { background: var(--bg-join); color: var(--color-join); }
@@ -352,8 +354,14 @@
   .w { background: var(--bg-wait); color: var(--color-wait); }
 
   .time {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 46%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     color: var(--md-on-surface-variant);
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
 
   .err {
@@ -1391,38 +1399,72 @@
     transition: transform 0.25s ease;
   }
 
-  /* ── Activity view ── */
+  /* ── Activity view (compact list) ── */
   .activity-view-container {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+    display: block;
   }
-  .activity-log-row {
+  .activity-log-card {
     background: var(--md-surface);
     border: 1px solid var(--md-outline);
-    border-radius: 10px;
-    padding: 10px 14px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    border-radius: var(--radius-card);
     box-shadow: var(--shadow-1);
+    padding: 2px 12px;
   }
+  .activity-log-row {
+    display: grid;
+    grid-template-columns: 16px minmax(64px, 130px) auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 0;
+    border-bottom: 1px solid #f2f2f2;
+    font-size: 0.8rem;
+    line-height: 1.25;
+  }
+  .activity-log-row:last-child { border-bottom: none; }
   .activity-log-row .act-icon {
-    flex-shrink: 0;
-    margin-top: 2px;
-  }
-  .activity-log-row .act-body {
-    flex: 1;
-    min-width: 0;
+    font-size: 16px;
   }
   .activity-log-row .act-name {
     font-weight: 600;
-    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .activity-log-row .action-chip {
+    padding: 1px 5px;
+    font-size: 0.68rem;
+    gap: 0;
+    white-space: nowrap;
   }
   .activity-log-row .act-meta {
-    font-size: 0.75rem;
+    min-width: 0;
     color: var(--md-on-surface-variant);
-    margin-top: 2px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .activity-log-row .act-time {
+    color: var(--md-on-surface-variant);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Narrow screens: keep name/status/time on one line, drop the event context below it. */
+  @media (max-width: 480px) {
+    .activity-log-row {
+      grid-template-columns: 16px minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        "icon name chip time"
+        "icon meta meta meta";
+      row-gap: 1px;
+    }
+    .activity-log-row .act-icon { grid-area: icon; align-self: start; }
+    .activity-log-row .act-name { grid-area: name; }
+    .activity-log-row .action-chip { grid-area: chip; }
+    .activity-log-row .act-time { grid-area: time; }
+    .activity-log-row .act-meta { grid-area: meta; }
   }
 
   /* ── Toast notifications ── */
