@@ -108,4 +108,14 @@ const CONFIG = {
 ## 📱 Viewing Results
 
 Access the viewer interface from any desktop or mobile browser at:
+
+---
+
+## 🧰 Tools
+
+### `tools/dupr` — DUPR rating lookup
+Local proxy + page for pulling DUPR ratings for a list of names (filtered to CT/MA) using your own
+logged-in DUPR session: `npm run dupr` → <http://localhost:8787>. Setup and caveats:
+[`tools/dupr/README.md`](tools/dupr/README.md). The session cookie lives in
+`tools/dupr/cookie.txt`, which is git-ignored.
 `https://d22bq7zsasshul.cloudfront.net/viewer.html`

@@ -1,2 +1,6 @@
 node_modules/
 package-lock.json
+
+# DUPR lookup proxy: session cookie and cached ratings stay local
+tools/dupr/cookie.txt
+tools/dupr/cache.json

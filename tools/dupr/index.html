@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DUPR lookup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Palette lifted from dashboard.dupr.com: navy #05155E, accent #3A79E0, gray surfaces */
+  :root {
+    --navy: #05155e;
+    --navy-60: rgba(5, 21, 94, .6);
+    --navy-10: rgba(5, 21, 94, .1);
+    --navy-05: rgba(5, 21, 94, .05);
+    --accent: #3a79e0;
+    --accent-soft: #eaf1fd;
+    --page: #f3f4f6;
+    --surface: #ffffff;
+    --line: #e5e7eb;
+    --muted: #6b7280;
+    --good: #0f7b4f;
+    --good-soft: #e6f4ec;
+    --warn: #9a5b00;
+    --warn-soft: #fdf2e0;
+    --bad: #b3261e;
+    --bad-soft: #fdecea;
+    --shadow-card: 0 1px 2px rgba(5, 21, 94, .04), 0 8px 24px -16px rgba(5, 21, 94, .25);
+    --shadow-float: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+    --radius-card: 16px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--navy);
+    font: 15px/1.45 Inter, Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 22px 18px 72px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+
+  /* ── header ── */
+  header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-mark {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--navy); color: #fff; font-weight: 700; font-size: .84rem; letter-spacing: -.02em;
+  }
+  h1 { font-size: 1.05rem; margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  h1 span { display: block; font-size: .74rem; font-weight: 500; color: var(--navy-60); letter-spacing: 0; }
+  .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+    padding: 5px 11px; font-size: .74rem; font-weight: 600;
+    background: var(--navy-05); color: var(--navy-60);
+  }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .pill.ok { background: var(--good-soft); color: var(--good); }
+  .pill.bad { background: var(--bad-soft); color: var(--bad); }
+
+  /* ── controls ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card); padding: 16px;
+  }
+  .segmented { display: inline-flex; background: var(--navy-05); border-radius: 999px; padding: 3px; gap: 2px; }
+  .segmented button {
+    border: 0; background: transparent; color: var(--navy-60); font: inherit; font-weight: 600;
+    font-size: .82rem; padding: 7px 16px; border-radius: 999px; cursor: pointer;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--navy); box-shadow: var(--shadow-card); }
+
+  .search-row { position: relative; margin-top: 14px; }
+  .search-row svg { position: absolute; left: 17px; top: 50%; transform: translateY(-50%); color: var(--navy-60); }
+  .search-input {
+    width: 100%; height: 52px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--surface); color: var(--navy); font: inherit; font-size: .95rem;
+    padding: 0 132px 0 46px; box-shadow: var(--shadow-float);
+  }
+  .search-input::placeholder { color: #9ca3af; }
+  .search-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .primary {
+    height: 40px; border: 0; border-radius: 999px; padding: 0 20px;
+    background: var(--navy); color: #fff; font: inherit; font-weight: 600; font-size: .85rem; cursor: pointer;
+  }
+  .primary:hover:not(:disabled) { background: #0a1f7a; }
+  .primary:disabled { opacity: .55; cursor: default; }
+  .search-go { position: absolute; right: 6px; top: 6px; }
+
+  textarea {
+    width: 100%; min-height: 116px; resize: vertical; margin-top: 14px;
+    border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--navy);
+    font: 500 .85rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; padding: 12px 14px;
+  }
+  textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+  .field { display: inline-flex; align-items: center; gap: 8px; background: var(--navy-05); border-radius: 999px; padding: 4px 6px 4px 14px; }
+  .field label { font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--navy-60); }
+  .field input {
+    border: 0; background: var(--surface); border-radius: 999px; height: 30px; padding: 0 12px;
+    font: inherit; font-size: .82rem; color: var(--navy); width: 168px;
+  }
+  .field input:focus { outline: 2px solid var(--accent); }
+  .switch { display: inline-flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--navy-60); cursor: pointer; user-select: none; }
+  .switch input { accent-color: var(--accent); width: 15px; height: 15px; }
+  .ghost {
+    border: 1px solid var(--line); background: var(--surface); color: var(--navy);
+    border-radius: 999px; padding: 8px 15px; font: inherit; font-weight: 600; font-size: .82rem; cursor: pointer;
+  }
+  .ghost:hover:not(:disabled) { background: var(--navy-05); }
+  .ghost:disabled { opacity: .5; cursor: default; }
+  .hint { margin: 10px 0 0; font-size: .78rem; color: var(--muted); }
+  .hint code, .hint strong { color: var(--navy); }
+  .hint code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; font-size: .76rem; }
+
+  /* ── results list ── */
+  .results-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; margin: 2px 2px 10px; }
+  .results-title { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--navy-60); }
+  .results-meta { font-size: .8rem; color: var(--muted); }
+  .results-meta b { color: var(--navy); }
+
+  .group { margin-bottom: 14px; }
+  .group-label { display: flex; align-items: baseline; gap: 8px; margin: 0 0 6px 2px; font-size: .82rem; font-weight: 700; }
+  .group-label small { font-weight: 500; color: var(--muted); font-size: .76rem; }
+
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .row {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 11px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent;
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+  }
+  .list .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--navy-05); }
+  .row.selected { background: var(--accent-soft); }
+  .avatar {
+    flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; overflow: hidden;
+    background: var(--navy-10); color: var(--navy); display: grid; place-items: center;
+    font-weight: 700; font-size: .8rem;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .who { flex: 1; min-width: 0; }
+  .who-name { font-weight: 600; font-size: .92rem; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .who-id { font-size: .67rem; font-weight: 700; letter-spacing: .04em; color: var(--navy-60); background: var(--navy-05); border-radius: 5px; padding: 1px 5px; }
+  .who-sub { color: var(--muted); font-size: .78rem; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ratings { display: flex; gap: 6px; flex: 0 0 auto; }
+  .rating {
+    display: inline-flex; align-items: baseline; gap: 4px; border-radius: 999px; padding: 4px 10px;
+    font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  .rating em { font-style: normal; font-weight: 700; font-size: .63rem; letter-spacing: .06em; text-transform: uppercase; opacity: .7; }
+  .rating.ok { background: var(--good-soft); color: var(--good); }
+  .rating.mid { background: var(--warn-soft); color: var(--warn); }
+  .rating.low { background: var(--bad-soft); color: var(--bad); }
+  .rating.none { background: var(--navy-05); color: var(--navy-60); }
+  .selected-mark {
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; visibility: hidden;
+  }
+  .row.selected .selected-mark { visibility: visible; }
+
+  .empty-row { padding: 15px 16px; color: var(--muted); font-size: .84rem; }
+  .banner { border-radius: 12px; padding: 11px 14px; font-size: .85rem; }
+  .banner.err { background: var(--bad-soft); color: var(--bad); }
+  .banner code { background: rgba(0, 0, 0, .06); padding: 1px 5px; border-radius: 5px; }
+  .empty-state { text-align: center; padding: 34px 16px; color: var(--muted); font-size: .88rem; }
+  .empty-state strong { display: block; color: var(--navy); font-size: .95rem; margin-bottom: 4px; }
+  .spin { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  details.help { font-size: .82rem; color: var(--muted); }
+  details.help summary { cursor: pointer; font-weight: 600; color: var(--navy); }
+  details.help ol { margin: 8px 0 0; padding-left: 20px; }
+  details.help code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; color: var(--navy); }
+
+  @media (max-width: 640px) {
+    body { padding: 16px 12px 60px; }
+    .search-input { padding-right: 108px; }
+    .row { flex-wrap: wrap; }
+    .ratings { width: 100%; padding-left: 54px; }
+    .who-sub { white-space: normal; }
+    .field input { width: 132px; }
+    .selected-mark { display: none; }
+    .row.selected { box-shadow: inset 3px 0 0 var(--accent); }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="brand-mark">DU</div>
+      <h1>DUPR lookup<span>api.dupr.com via local proxy</span></h1>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill" id="cookiePill">checking…</span>
+    <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
+  </header>
+
+  <section class="card">
+    <div class="segmented" role="group" aria-label="Search mode">
+      <button type="button" id="modeSingle" aria-pressed="true">One name</button>
+      <button type="button" id="modeMulti" aria-pressed="false">Multiple names</button>
+    </div>
+
+    <div id="singlePane">
+      <div class="search-row">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path>
+        </svg>
+        <input class="search-input" id="singleInput" type="search" placeholder="Search a player by full name…" autocomplete="off" spellcheck="false" />
+        <button class="primary search-go" id="singleGo" type="button">Search</button>
+      </div>
+      <p class="hint">Enter searches DUPR and lists every same-name profile — narrow it with the location filter.</p>
+    </div>
+
+    <div id="multiPane" hidden>
+      <textarea id="names" spellcheck="false" aria-label="Names to look up, one per line"
+                placeholder="John Doe&#10;Jane Doe"></textarea>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+        <button class="primary" id="multiGo" type="button" style="height:42px">Look up all</button>
+        <button class="ghost" id="clearBtn" type="button">Clear</button>
+      </div>
+      <p class="hint">One name per line. Ctrl/&#8984; + Enter runs the lookup.</p>
+    </div>
+
+    <div class="filters">
+      <span class="field">
+        <label for="locInput">Location</label>
+        <input id="locInput" type="text" list="locList" placeholder="CT, MA" value="CT, MA" autocomplete="off" spellcheck="false" />
+      </span>
+      <datalist id="locList">
+        <option value="CT, MA"></option>
+        <option value="CT"></option>
+        <option value="MA"></option>
+        <option value="Hartford"></option>
+        <option value="Springfield"></option>
+        <option value="New York, NY"></option>
+      </datalist>
+      <label class="switch"><input type="checkbox" id="sortRating" /> sort by doubles</label>
+      <div class="spacer"></div>
+      <button class="ghost" id="csvBtn" type="button" disabled>Export CSV</button>
+    </div>
+    <p class="hint">
+      Location matches the address DUPR returns (e.g. <em>Granby, CT, US</em>): a <strong>2-letter</strong> entry must equal the state code,
+      anything longer is matched inside the city/state text. Comma-separate for several (<code>CT, MA</code>), leave empty for all locations.
+      Only the first 30 same-name hits per name are scanned.
+    </p>
+  </section>
+
+  <div id="banner"></div>
+
+  <section id="resultsPane" hidden>
+    <div class="results-head">
+      <span class="results-title" id="resultsTitle">Results</span>
+      <span class="results-meta" id="resultsMeta"></span>
+    </div>
+    <div id="results"></div>
+  </section>
+
+  <details class="help card">
+    <summary>Which cookies do I copy?</summary>
+    <ol>
+      <li>Sign in at <code>https://dashboard.dupr.com</code>, open DevTools → <code>Application</code> → <code>Cookies</code>.</li>
+      <li>Copy the two <code>__Host-</code> cookies whose domain is <code>api.dupr.com</code>:
+        <code>__Host-dupr_at</code> (JWT access token — the important one) and <code>__Host-dupr_rt</code> (refresh token).</li>
+      <li>Paste them as one line into <code>tools/dupr/cookie.txt</code> (git-ignored) —
+        <code>__Host-dupr_at=eyJ…; __Host-dupr_rt=eyJ…</code> — or set <code>DUPR_COOKIE</code>, then restart <code>npm run dupr</code>.</li>
+    </ol>
+    <p style="margin:8px 0 0">Analytics/payment cookies (<code>_ga</code>, <code>_fbp</code>, <code>__stripe_*</code>,
+      <code>ab.storage.*</code>, media/Facebook cookies…) are ignored. The access token lasts ~30 days; when DUPR
+      rejects it, copy a fresh one.</p>
+  </details>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const el = {
+  cookiePill: $('cookiePill'), verifyBtn: $('verifyBtn'), modeSingle: $('modeSingle'), modeMulti: $('modeMulti'),
+  singlePane: $('singlePane'), multiPane: $('multiPane'), singleInput: $('singleInput'), singleGo: $('singleGo'),
+  names: $('names'), multiGo: $('multiGo'), clearBtn: $('clearBtn'), locInput: $('locInput'),
+  sortRating: $('sortRating'), csvBtn: $('csvBtn'), banner: $('banner'),
+  resultsPane: $('resultsPane'), results: $('results'), resultsTitle: $('resultsTitle'), resultsMeta: $('resultsMeta'),
+};
+
+const store = {
+  mode: localStorage.getItem('dupr_mode') === 'multi' ? 'multi' : 'single',
+  entries: [],
+  picks: {},
+  hasCookie: false,
+};
+
+// no default names: the field starts empty and only remembers what you type locally
+localStorage.removeItem('dupr_names'); // drop the roster cached by earlier builds
+el.names.value = localStorage.getItem('dupr_names_typed') || '';
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+
+// ── location filter (client side: DUPR ignores its own locationText param) ───
+const locTokens = () => el.locInput.value.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+// 2-letter tokens are treated as state codes (so "CT" doesn't match "Victoria"), longer ones are
+// substring matches against the address (city or full state name).
+const matchesLocation = (hit, tokens) => {
+  if (!tokens.length) return true;
+  const addr = (hit.address || '').toLowerCase();
+  const state = (hit.state || '').toLowerCase();
+  return tokens.some((t) => (t.length <= 2 ? state === t : addr.includes(t)));
+};
+
+// ── rendering ────────────────────────────────────────────────────────────────
+const ratingChip = (label, value, reliability) => {
+  if (value == null) return `<span class="rating none"><em>${label}</em>NR</span>`;
+  const rel = reliability == null ? null : Math.round(reliability);
+  const tone = rel == null ? 'none' : rel >= 80 ? 'ok' : rel >= 50 ? 'mid' : 'low';
+  return `<span class="rating ${tone}" title="${label === 'D' ? 'Doubles' : 'Singles'} ${value.toFixed(3)} · reliability ${rel ?? '?'}/100"><em>${label}</em>${value.toFixed(3)}${rel == null ? '' : ` · ${rel}`}</span>`;
+};
+
+function rowHtml(entry, hit, tokens) {
+  const selected = store.picks[entry.query] === hit.id;
+  const outside = tokens.length && !matchesLocation(hit, tokens);
+  const sub = [hit.address || 'no address', hit.age ?? null, hit.gender ? hit.gender[0].toUpperCase() : null].filter((v) => v !== null && v !== '').join(' · ');
+  return `<button type="button" class="row${selected ? ' selected' : ''}" data-query="${esc(entry.query)}" data-id="${esc(hit.id)}">
+    <span class="avatar">${hit.image ? `<img src="${esc(hit.image)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(hit.name))}</span>
+    <span class="who">
+      <span class="who-name">${esc(hit.name)} <span class="who-id">${esc(hit.id || '')}</span>${outside ? ' <span class="who-id" style="background:var(--warn-soft);color:var(--warn)">outside filter</span>' : ''}</span>
+      <span class="who-sub">${esc(sub)}</span>
+    </span>
+    <span class="ratings">${ratingChip('D', hit.doubles, hit.doublesReliability)}${ratingChip('S', hit.singles, hit.singlesReliability)}</span>
+    <span class="selected-mark">&#10003;</span>
+  </button>`;
+}
+
+function render() {
+  const tokens = locTokens();
+  const single = store.mode === 'single';
+
+  let namesMatched = 0;
+  let rowCount = 0;
+  const blocks = [];
+
+  for (const entry of store.entries) {
+    const allHits = entry.hits || [];
+    let hits = allHits.filter((h) => matchesLocation(h, tokens));
+    if (el.sortRating.checked) hits = [...hits].sort((a, b) => (b.doubles ?? -1) - (a.doubles ?? -1));
+
+    // Pick a default once per search (top row); filtering never re-points an existing choice.
+    if (!allHits.some((h) => h.id === store.picks[entry.query])) {
+      const preferred = hits[0] || allHits[0];
+      if (preferred) store.picks[entry.query] = preferred.id;
+    }
+
+    if (hits.length) namesMatched += 1;
+    rowCount += hits.length;
+
+    let body;
+    if (!hits.length) {
+      const why = entry.error
+        ? (entry.error === 'skipped' ? 'not attempted' : `lookup failed${entry.hint ? ' — ' + entry.hint : ''}`)
+        : `no match${tokens.length ? ' in “' + el.locInput.value.trim() + '”' : ''}` +
+          (entry.total ? ` — scanned ${allHits.length} of ${entry.total} same-name profiles` : '');
+      body = `<div class="empty-row">${esc(entry.query)} · ${esc(why)}</div>`;
+    } else {
+      body = hits.map((h) => rowHtml(entry, h, tokens)).join('');
+    }
+
+    blocks.push(single
+      ? `<div class="list">${body}</div>`
+      : `<div class="group"><div class="group-label">${esc(entry.query)} <small>${hits.length ? `${hits.length} profile${hits.length === 1 ? '' : 's'}` : 'no match'}</small></div><div class="list">${body}</div></div>`);
+  }
+
+  const scanned = (store.entries[0]?.hits || []).length;
+  el.resultsTitle.textContent = single ? 'Results' : 'Roster lookup';
+  el.resultsMeta.innerHTML = single
+    ? `<b>${rowCount}</b> profile${rowCount === 1 ? '' : 's'} shown · scanned ${scanned} of ${store.entries[0]?.total ?? scanned} same-name profiles`
+    : `<b>${namesMatched}</b> of ${store.entries.length} names matched`;
+  el.resultsMeta.innerHTML += (tokens.length ? ` · location “${esc(el.locInput.value.trim())}”` : ' · all locations')
+    + (el.sortRating.checked ? ' · sorted by doubles' : '');
+
+  el.results.innerHTML = blocks.join('') || '<div class="card empty-state"><strong>Nothing yet</strong>Search a name above, or switch to “Multiple names” to look up a roster.</div>';
+  el.resultsPane.hidden = false;
+  el.csvBtn.disabled = !store.entries.length;
+}
+
+// ── proxy status ─────────────────────────────────────────────────────────────
+function pill(kind, text) {
+  el.cookiePill.className = 'pill' + (kind ? ' ' + kind : '');
+  el.cookiePill.textContent = text;
+}
+
+async function checkStatus() {
+  try {
+    const j = await (await fetch('/api/status')).json();
+    store.hasCookie = !!j.cookieSet;
+    pill(store.hasCookie ? '' : 'bad', store.hasCookie ? 'cookie set' : 'no cookie');
+  } catch {
+    pill('bad', 'proxy offline');
+  }
+}
+
+async function verifyCookie() {
+  el.verifyBtn.disabled = true;
+  pill('', 'testing…');
+  try {
+    const j = await (await fetch('/api/verify')).json();
+    pill(j.ok ? 'ok' : 'bad', j.ok ? 'cookie works' : (j.reason === 'cookie-rejected' ? 'cookie rejected' : (j.reason || 'failed')));
+  } catch {
+    pill('bad', 'proxy offline');
+  } finally {
+    el.verifyBtn.disabled = false;
+  }
+}
+
+function showAuthBanner(entry) {
+  const detail = entry?.hint || entry?.message || '';
+  el.banner.innerHTML = store.hasCookie
+    ? `<div class="banner err">DUPR rejected the credentials${detail ? ' — ' + esc(detail) : ' — copy a fresh cookie and restart the proxy.'}</div>`
+    : '<div class="banner err">No session cookie yet — save your DUPR cookie to <code>tools/dupr/cookie.txt</code> and restart the proxy.</div>';
+}
+
+// ── search ───────────────────────────────────────────────────────────────────
+async function runSingle() {
+  const query = el.singleInput.value.trim();
+  if (!query) { el.singleInput.focus(); return; }
+  localStorage.setItem('dupr_single', query);
+  el.singleGo.disabled = true;
+  el.singleGo.innerHTML = '<span class="spin"></span>';
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    store.entries = [j];
+    store.picks = {};
+    if (j.error === 'cookie-rejected') showAuthBanner(j); else el.banner.innerHTML = '';
+    render();
+  } catch (e) {
+    el.banner.innerHTML = `<div class="banner err">${esc(e.message)}</div>`;
+  } finally {
+    el.singleGo.disabled = false;
+    el.singleGo.textContent = 'Search';
+  }
+}
+
+async function runMulti() {
+  const names = el.names.value.split(/\r?\n/).map((n) => n.trim()).filter(Boolean);
+  if (!names.length) return;
+  localStorage.setItem('dupr_names_typed', el.names.value);
+  el.multiGo.disabled = true;
+  el.multiGo.innerHTML = '<span class="spin"></span> Looking up…';
+  try {
+    const res = await fetch('/api/bulk', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ names }),
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    store.entries = j.results || [];
+    store.picks = {};
+    const rejected = store.entries.find((x) => x.error === 'cookie-rejected');
+    if (rejected) {
+      showAuthBanner(rejected);
+      const done = new Set(store.entries.map((x) => x.query));
+      for (const name of names) if (!done.has(name)) store.entries.push({ query: name, hits: [], total: 0, error: 'skipped' });
+    } else {
+      el.banner.innerHTML = '';
+    }
+    render();
+  } catch (e) {
+    el.banner.innerHTML = `<div class="banner err">${esc(e.message)}</div>`;
+  } finally {
+    el.multiGo.disabled = false;
+    el.multiGo.textContent = 'Look up all';
+  }
+}
+
+function setMode(mode) {
+  store.mode = mode;
+  localStorage.setItem('dupr_mode', mode);
+  el.modeSingle.setAttribute('aria-pressed', String(mode === 'single'));
+  el.modeMulti.setAttribute('aria-pressed', String(mode === 'multi'));
+  el.singlePane.hidden = mode !== 'single';
+  el.multiPane.hidden = mode !== 'multi';
+  el.banner.innerHTML = '';
+  store.entries = [];
+  store.picks = {};
+  el.resultsPane.hidden = true;
+  el.csvBtn.disabled = true;
+  if (mode === 'single') setTimeout(() => el.singleInput.focus(), 30);
+}
+
+function exportCsv() {
+  const tokens = locTokens();
+  const head = ['requested_name', 'dupr_name', 'dupr_id', 'location', 'age', 'doubles', 'doubles_reliability', 'singles', 'singles_reliability'];
+  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = [head.join(',')];
+  for (const entry of store.entries) {
+    const hit = (entry.hits || []).find((h) => h.id === store.picks[entry.query])
+      || (entry.hits || []).filter((h) => matchesLocation(h, tokens))[0];
+    lines.push(hit
+      ? [q(entry.query), q(hit.name), q(hit.id), q(hit.address), q(hit.age), q(hit.doubles ?? 'NR'), q(hit.doublesReliability ?? ''), q(hit.singles ?? 'NR'), q(hit.singlesReliability ?? '')].join(',')
+      : [q(entry.query), '', '', '', '', '', '', '', ''].join(','));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dupr-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── events ───────────────────────────────────────────────────────────────────
+el.modeSingle.addEventListener('click', () => setMode('single'));
+el.modeMulti.addEventListener('click', () => setMode('multi'));
+el.singleGo.addEventListener('click', runSingle);
+el.singleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSingle(); });
+el.multiGo.addEventListener('click', runMulti);
+el.names.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runMulti(); });
+el.clearBtn.addEventListener('click', () => { el.names.value = ''; store.entries = []; store.picks = {}; el.resultsPane.hidden = true; el.csvBtn.disabled = true; });
+el.csvBtn.addEventListener('click', exportCsv);
+el.verifyBtn.addEventListener('click', verifyCookie);
+el.locInput.addEventListener('input', () => store.entries.length && render());
+el.sortRating.addEventListener('change', () => store.entries.length && render());
+
+el.results.addEventListener('click', (e) => {
+  const row = e.target.closest('.row');
+  if (!row) return;
+  store.picks[row.dataset.query] = row.dataset.id;
+  render();
+});
+
+el.singleInput.value = localStorage.getItem('dupr_single') || '';
+checkStatus();
+setMode(store.mode);
+</script>
+</body>
+</html>

@@ -4,7 +4,8 @@
   "description": "Background runner for CourtReserve Watcher",
   "main": "watcher.js",
   "scripts": {
-    "start": "node watcher.js"
+    "start": "node watcher.js",
+    "dupr": "node tools/dupr/server.mjs"
   },
   "dependencies": {
     "node-fetch": "^2.7.0"
