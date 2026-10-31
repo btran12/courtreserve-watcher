@@ -148,6 +148,10 @@ curl "$URL/api/bulk" -H "x-dupr-token: $TOKEN" -H 'content-type: application/jso
 
 # health / cache info
 curl "$URL/api/status" -H "x-dupr-token: $TOKEN"
+
+# player profile + recent matches (duprId from a search hit)
+curl "$URL/api/player/99V2GJ" -H "x-dupr-token: $TOKEN"
+curl "$URL/api/player/99V2GJ/matches?limit=10&offset=0" -H "x-dupr-token: $TOKEN"
 ```
 
 Notes for the Lambda flavour:
@@ -165,7 +169,7 @@ Styled after the DUPR dashboard (navy `#05155E`, accent `#3A79E0`, white cards, 
 
 - **One name** — type a full name and press Enter. Every same-name DUPR profile comes back as a list
   row (photo/initials, name, DUPR ID, city-state · age · gender, doubles/singles chips with
-  reliability). Click a row to select it (selection drives the CSV export).
+  reliability). Click a row to open that player's profile and recent match history.
 - **Multiple names** — paste a roster (one per line, the box shows placeholder examples such as
   `John Doe` / `Jane Doe` and starts empty), **Look up all**. Each name gets its own group with its
   candidate profiles; unmatched names show why (`no match in "CT, MA" — 3 same-name profiles elsewhere`).
@@ -187,6 +191,11 @@ Styled after the DUPR dashboard (navy `#05155E`, accent `#3A79E0`, white cards, 
 - DUPR sorts by proximity, so the club's coordinates (`DUPR_LAT`/`DUPR_LNG`, default East Hartford)
   are sent with each query. Only the first 3 pages (30 hits) are scanned per name.
 - `limit` must be ≤ 10 — larger values return `400`.
+- Profile and match history load on demand when a result row is clicked. The proxy maps the
+  6-character DUPR id to DUPR's internal numeric user id (`/player/search/byDuprId`) and caches the
+  lookup, profile and first match page per warm container. Match history uses the dashboard's player
+  history route (`POST /player/v1.0/{userId}/history`), which replaced the retired unauthenticated
+  history route and works with a normal (non-admin) session.
 - Ratings carry `doublesReliabilityScore` / `singlesReliabilityScore` (0–100). The page colours them:
   green ≥ 80, amber ≥ 50, red below that. A high rating with low reliability (e.g. rel 10) is weak.
 - Results are cached in `tools/dupr/cache.json` for 6 h (`DUPR_CACHE_MINUTES`), so re-running a

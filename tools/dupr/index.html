@@ -140,6 +140,41 @@
   .settings .field input { flex: 1; min-width: 0; width: auto; }
   .settings-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
+  /* ── player profile modal ── */
+  .player-modal { width: min(680px, calc(100vw - 28px)); }
+  .player-head { display: flex; align-items: center; gap: 14px; }
+  .player-avatar {
+    flex: 0 0 auto; width: 56px; height: 56px; border-radius: 50%; overflow: hidden;
+    background: var(--navy-10); display: grid; place-items: center; font-weight: 700; font-size: 1rem;
+  }
+  .player-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .player-who { flex: 1; min-width: 0; }
+  .player-name { font-size: 1.1rem; font-weight: 700; }
+  .player-meta { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+  .player-ratings { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .player-section { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .player-section h3 { margin: 0; font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--navy-60); }
+  .player-section span { font-size: .78rem; color: var(--muted); }
+  .match-list { display: grid; gap: 8px; }
+  .match { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .match-top { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--muted); }
+  .match-event { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .match-result { flex: 0 0 auto; border-radius: 999px; padding: 2px 8px; font-size: .68rem; font-weight: 700; letter-spacing: .04em; }
+  .match-result.win { background: var(--good-soft); color: var(--good); }
+  .match-result.loss { background: var(--bad-soft); color: var(--bad); }
+  .match-body { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
+  .match-players { flex: 1; min-width: 0; font-size: .82rem; }
+  .match-players div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .match-players .vs { color: var(--muted); font-size: .76rem; }
+  .match-score { font-variant-numeric: tabular-nums; font-weight: 600; font-size: .82rem; white-space: nowrap; }
+  .match-rating { text-align: right; font-size: .72rem; color: var(--muted); white-space: nowrap; min-width: 52px; }
+  .match-rating b { display: block; color: var(--navy); font-size: .86rem; }
+  .match-rating .up { color: var(--good); }
+  .match-rating .down { color: var(--bad); }
+  .player-empty { padding: 18px 4px; text-align: center; color: var(--muted); font-size: .84rem; }
+  .player-loading { display: flex; align-items: center; gap: 8px; padding: 12px 4px; color: var(--muted); font-size: .84rem; }
+  #playerMore { justify-self: start; }
+
   /* ── results list ── */
   .results-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; margin: 2px 2px 10px; }
   .results-title { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--navy-60); }
@@ -237,7 +272,8 @@
         <input class="search-input" id="singleInput" type="search" placeholder="Search a player by full name…" autocomplete="off" spellcheck="false" />
         <button class="primary search-go" id="singleGo" type="button">Search</button>
       </div>
-      <p class="hint">Enter searches DUPR and lists every same-name profile — narrow it with the location filter.</p>
+      <p class="hint">Enter searches DUPR and lists every same-name profile — narrow it with the location filter.
+        Click a result to see their profile and recent matches.</p>
     </div>
 
     <div id="multiPane" hidden>
@@ -332,10 +368,20 @@
   </div>
 </dialog>
 
+<dialog class="modal player-modal" id="playerModal" aria-labelledby="playerTitle">
+  <div class="modal-head">
+    <h2 id="playerTitle">Player</h2>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="playerClose" type="button" aria-label="Close player profile">&times;</button>
+  </div>
+  <div class="modal-body" id="playerBody"></div>
+</dialog>
+
 <script>
 const $ = (id) => document.getElementById(id);
 const el = {
   cookiePill: $('cookiePill'), verifyBtn: $('verifyBtn'), settingsBtn: $('settingsBtn'), settingsModal: $('settingsModal'),
+  playerModal: $('playerModal'), playerTitle: $('playerTitle'), playerBody: $('playerBody'), playerClose: $('playerClose'),
   modeSingle: $('modeSingle'), modeMulti: $('modeMulti'),
   singlePane: $('singlePane'), multiPane: $('multiPane'), singleInput: $('singleInput'), singleGo: $('singleGo'),
   names: $('names'), multiGo: $('multiGo'), clearBtn: $('clearBtn'), locInput: $('locInput'),
@@ -350,6 +396,14 @@ const store = {
   entries: [],
   picks: {},
   hasCookie: false,
+};
+
+const playerState = {
+  hit: null,
+  seq: 0,
+  matches: [],
+  hasMore: false,
+  loading: false,
 };
 
 // no default names: the field starts empty and only remembers what you type locally
@@ -378,6 +432,17 @@ const apiFetch = (url, opts = {}) => {
 const apiErrorText = (e) => (e.message === 'bad-token'
   ? 'This endpoint requires an API key — open “Settings” and paste the x-dupr-token value from the stack output.'
   : e.message);
+const apiJson = async (url) => {
+  const res = await apiFetch(url);
+  let j = {};
+  try { j = await res.json(); } catch { /* non-JSON error page */ }
+  if (!res.ok || j.error) {
+    const err = new Error(j.message || j.error || `HTTP ${res.status}`);
+    err.payload = j;
+    throw err;
+  }
+  return j;
+};
 
 // ── location filter (client side: DUPR ignores its own locationText param) ───
 const locTokens = () => el.locInput.value.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
@@ -461,6 +526,164 @@ function render() {
 
   el.results.innerHTML = blocks.join('') || '<div class="card empty-state"><strong>Nothing yet</strong>Search a name above, or switch to “Multiple names” to look up a roster.</div>';
   el.resultsPane.hidden = false;
+}
+
+// ── player profile + match history ───────────────────────────────────────────
+const playerNum = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+const fmtMatchDate = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+function playerHeadHtml(p) {
+  const name = p.name || p.fullName || p.fullname || 'Player';
+  const id = p.id || p.duprId || '';
+  const address = p.address || p.shortAddress || '';
+  const gender = p.gender ? String(p.gender)[0].toUpperCase() : null;
+  const meta = [id, address, p.age ?? null, gender].filter((v) => v !== null && v !== '').join(' · ');
+  const image = p.image || p.imageUrl || null;
+  return `<span class="player-avatar">${image ? `<img src="${esc(image)}" alt="" loading="lazy" onerror="this.remove()">` : esc(initials(name))}</span>
+    <div class="player-who">
+      <div class="player-name">${esc(name)}</div>
+      <div class="player-meta">${esc(meta)}</div>
+      <div class="player-ratings">${ratingChip('D', playerNum(p.doubles ?? p.ratings?.doubles), p.doublesReliability ?? p.ratings?.doublesReliabilityScore)}${ratingChip('S', playerNum(p.singles ?? p.ratings?.singles), p.singlesReliability ?? p.ratings?.singlesReliabilityScore)}</div>
+    </div>`;
+}
+
+function matchHtml(m) {
+  const result = m.won === true ? '<span class="match-result win">WIN</span>'
+    : m.won === false ? '<span class="match-result loss">LOSS</span>' : '';
+  const partner = m.partner?.name
+    ? `<div>With ${esc(m.partner.name)}</div>`
+    : `<div>${m.format === 'SINGLES' ? 'Singles' : 'Doubles'}</div>`;
+  const opponents = m.opponents?.length
+    ? `<div class="vs">vs ${esc(m.opponents.map((o) => o.name).filter(Boolean).join(' & '))}</div>`
+    : '';
+  const score = (m.games || []).map(([you, them]) => `${you}-${them}`).join(', ');
+  const rating = m.before != null
+    ? `<b>${m.before.toFixed(2)}</b>${m.impact != null ? `<span class="${m.impact >= 0 ? 'up' : 'down'}">${m.impact > 0 ? '+' : ''}${m.impact.toFixed(2)}</span>` : ''}`
+    : '';
+  return `<div class="match">
+    <div class="match-top"><span>${esc(fmtMatchDate(m.date))}</span><span class="match-event">${esc(m.event || '')}</span>${result}</div>
+    <div class="match-body">
+      <div class="match-players">${partner}${opponents}</div>
+      ${score ? `<div class="match-score">${esc(score)}</div>` : ''}
+      <div class="match-rating">${rating}</div>
+    </div>
+  </div>`;
+}
+
+function renderPlayerMatches() {
+  const list = $('playerMatchList');
+  const meta = $('playerMatchMeta');
+  const more = $('playerMore');
+  if (!list) return;
+  list.innerHTML = playerState.matches.length
+    ? playerState.matches.map(matchHtml).join('')
+    : '<div class="player-empty">No matches found.</div>';
+  if (meta) {
+    meta.textContent = playerState.matches.length
+      ? `${playerState.matches.length}${playerState.hasMore ? '+' : ''} match${playerState.matches.length === 1 ? '' : 'es'}`
+      : '';
+  }
+  if (more) {
+    more.hidden = !playerState.hasMore;
+    more.disabled = false;
+    more.textContent = 'Load more';
+  }
+}
+
+function updatePlayerHead(hit, data) {
+  const p = data.player || {};
+  const merged = {
+    ...hit,
+    name: p.fullName || p.fullname || hit.name,
+    id: p.duprId || p.id || hit.id,
+    address: p.shortAddress || p.address || hit.address,
+    age: p.age ?? hit.age,
+    gender: p.gender ?? hit.gender,
+    image: p.imageUrl || p.image || hit.image,
+    doubles: p.ratings?.doubles ?? hit.doubles,
+    doublesReliability: p.ratings?.doublesReliabilityScore ?? hit.doublesReliability,
+    singles: p.ratings?.singles ?? hit.singles,
+    singlesReliability: p.ratings?.singlesReliabilityScore ?? hit.singlesReliability,
+  };
+  const head = $('playerHead');
+  if (head) head.innerHTML = playerHeadHtml(merged);
+  el.playerTitle.textContent = merged.name || 'Player';
+}
+
+function openPlayer(hit) {
+  playerState.hit = hit;
+  playerState.seq += 1;
+  playerState.matches = [];
+  playerState.hasMore = false;
+  playerState.loading = false;
+  const seq = playerState.seq;
+
+  el.playerTitle.textContent = hit.name || 'Player';
+  el.playerBody.innerHTML = `
+    <div class="player-head" id="playerHead">${playerHeadHtml(hit)}</div>
+    <div class="player-section"><h3>Recent matches</h3><span id="playerMatchMeta">loading…</span></div>
+    <div class="match-list" id="playerMatchList"><div class="player-loading"><span class="spin"></span> Loading profile and matches…</div></div>
+    <button class="ghost" id="playerMore" type="button" hidden>Load more</button>`;
+  if (!el.playerModal.open) el.playerModal.showModal();
+  loadPlayerData(hit, seq);
+}
+
+async function loadPlayerData(hit, seq) {
+  const id = encodeURIComponent(hit.id);
+  const name = encodeURIComponent(hit.name || '');
+  const [profileRes, matchRes] = await Promise.allSettled([
+    apiJson(`/api/player/${id}`),
+    apiJson(`/api/player/${id}/matches?limit=10&offset=0&name=${name}`),
+  ]);
+  if (seq !== playerState.seq) return;
+
+  if (profileRes.status === 'fulfilled') {
+    updatePlayerHead(hit, profileRes.value);
+  } else {
+    const meta = el.playerBody.querySelector('.player-meta');
+    if (meta && profileRes.reason?.payload?.hint) meta.textContent = profileRes.reason.payload.hint;
+  }
+
+  if (matchRes.status === 'fulfilled') {
+    playerState.matches = matchRes.value.hits || [];
+    playerState.hasMore = !!matchRes.value.hasMore;
+    renderPlayerMatches();
+  } else {
+    const err = matchRes.reason || {};
+    const list = $('playerMatchList');
+    const detail = err.payload?.hint || err.message || 'request failed';
+    if (list) list.innerHTML = `<div class="player-empty">Could not load matches — ${esc(detail)}</div>`;
+    const meta = $('playerMatchMeta');
+    if (meta) meta.textContent = '';
+    const more = $('playerMore');
+    if (more) more.hidden = true;
+  }
+}
+
+async function loadMorePlayerMatches() {
+  const hit = playerState.hit;
+  const more = $('playerMore');
+  if (!hit || !playerState.hasMore || playerState.loading) return;
+  playerState.loading = true;
+  const seq = playerState.seq;
+  if (more) { more.disabled = true; more.innerHTML = '<span class="spin"></span> Loading…'; }
+  try {
+    const j = await apiJson(`/api/player/${encodeURIComponent(hit.id)}/matches?limit=10&offset=${playerState.matches.length}&name=${encodeURIComponent(hit.name || '')}`);
+    if (seq !== playerState.seq) return;
+    playerState.matches.push(...(j.hits || []));
+    playerState.hasMore = !!j.hasMore;
+    renderPlayerMatches();
+  } catch (e) {
+    if (seq !== playerState.seq) return;
+    if (more) { more.disabled = false; more.textContent = 'Load more'; }
+    el.banner.innerHTML = `<div class="banner err">${esc(apiErrorText(e))}</div>`;
+  } finally {
+    playerState.loading = false;
+  }
 }
 
 // ── proxy status ─────────────────────────────────────────────────────────────
@@ -616,14 +839,24 @@ el.settingsClear.addEventListener('click', () => {
   checkStatus();
 });
 el.settingsClose.addEventListener('click', () => el.settingsModal.close());
+el.playerClose.addEventListener('click', () => el.playerModal.close());
+el.playerModal.addEventListener('click', (e) => {
+  if (e.target === el.playerModal) el.playerModal.close();
+});
+el.playerBody.addEventListener('click', (e) => {
+  if (e.target.closest('#playerMore')) loadMorePlayerMatches();
+});
 el.locInput.addEventListener('input', () => store.entries.length && render());
 el.sortRating.addEventListener('change', () => store.entries.length && render());
 
 el.results.addEventListener('click', (e) => {
   const row = e.target.closest('.row');
   if (!row) return;
+  const entry = store.entries.find((x) => x.query === row.dataset.query);
+  const hit = entry?.hits?.find((h) => h.id === row.dataset.id);
   store.picks[row.dataset.query] = row.dataset.id;
   render();
+  if (hit) openPlayer(hit);
 });
 
 el.singleInput.value = localStorage.getItem('dupr_single') || '';

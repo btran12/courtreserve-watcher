@@ -3,9 +3,23 @@
 //
 // Keep this file free of imports so it can be concatenated into a single CommonJS Lambda source.
 
-const API = 'https://api.dupr.com/player/v1.0/search';
+const BASE = 'https://api.dupr.com';
+const API = `${BASE}/player/v1.0/search`;
+const API_BY_DUPR = `${BASE}/player/search/byDuprId`;
+const API_PLAYER = (id) => `${BASE}/player/v1.0/${encodeURIComponent(id)}`;
+// Match history for any player, as used by the dashboard's own profile page. The old
+// /match/v1.0/history/unauthenticated route is retired, and the /admin/... replacement needs
+// admin access, so this is the route that works with a normal DUPR session.
+const API_MATCHES = (id) => `${BASE}/player/v1.0/${encodeURIComponent(id)}/history`;
+const matchBody = (offset, limit) => JSON.stringify({
+  filters: { eventFormat: null },
+  limit,
+  offset,
+  sort: { order: 'DESC', parameter: 'MATCH_DATE' },
+});
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const PAGE_SIZE = 10; // DUPR rejects larger limits
+const MATCH_PAGE = 10; // the player-history endpoint pages 10 at a time
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -50,6 +64,54 @@ export function annotate(hit) {
   };
 }
 
+const playerNameOf = (p) => p?.fullName || p?.fullname || '';
+
+// Turn one raw DUPR match into something the page can render without knowing DUPR's schema.
+export function annotateMatch(match, userId, playerName = '') {
+  const teams = Array.isArray(match.teams) ? match.teams : [];
+  const idMatch = (p) => p && userId != null && String(p.id) === String(userId);
+  const nameMatch = (p) => p && playerName
+    && playerNameOf(p).trim().toLowerCase() === String(playerName).trim().toLowerCase();
+  const isMe = (p) => idMatch(p) || nameMatch(p);
+
+  const playerTeam = teams.find((t) => isMe(t.player1) || isMe(t.player2)) || teams[0] || null;
+  const opponentTeam = teams.find((t) => t !== playerTeam) || null;
+  const meIsPlayer1 = !!(playerTeam && isMe(playerTeam.player1));
+  const singles = match.eventFormat === 'SINGLES';
+  const pre = playerTeam?.preMatchRatingAndImpact || {};
+  const beforeRaw = meIsPlayer1
+    ? (singles ? pre.preMatchSingleRatingPlayer1 : pre.preMatchDoubleRatingPlayer1)
+    : (singles ? pre.preMatchSingleRatingPlayer2 : pre.preMatchDoubleRatingPlayer2);
+  const impactRaw = meIsPlayer1
+    ? (singles ? pre.matchSingleRatingImpactPlayer1 : pre.matchDoubleRatingImpactPlayer1)
+    : (singles ? pre.matchSingleRatingImpactPlayer2 : pre.matchDoubleRatingImpactPlayer2);
+
+  const partner = playerTeam ? (meIsPlayer1 ? playerTeam.player2 : playerTeam.player1) : null;
+  const opponents = opponentTeam ? [opponentTeam.player1, opponentTeam.player2].filter(Boolean) : [];
+  const games = [];
+  for (let i = 1; i <= 5; i += 1) {
+    const you = playerTeam?.[`game${i}`];
+    const them = opponentTeam?.[`game${i}`];
+    if (you == null || you === -1) break;
+    games.push([you, them]);
+  }
+
+  const num = (v) => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+  return {
+    id: match.matchId ?? match.id,
+    date: match.eventDate || match.matchDate || null,
+    event: match.eventName || match.event || null,
+    format: match.eventFormat || null,
+    matchPlayType: match.matchPlayType || null,
+    won: playerTeam ? !!playerTeam.winner : null,
+    partner: partner ? { name: playerNameOf(partner), image: partner.imageUrl || null } : null,
+    opponents: opponents.map((p) => ({ name: playerNameOf(p), image: p.imageUrl || null })),
+    games,
+    before: num(beforeRaw),
+    impact: num(impactRaw),
+  };
+}
+
 export function createEngine(env = process.env) {
   const cookie = normalizeCookie(env.DUPR_COOKIE || '');
   const accessToken = (/(?:^|;\s*)__Host-dupr_at=([^;]+)/.exec(cookie) || [])[1] || '';
@@ -66,6 +128,9 @@ export function createEngine(env = process.env) {
   };
 
   const cache = new Map();
+  const idCache = new Map();
+  const playerCache = new Map();
+  const matchCache = new Map();
   let authMode = cfg.explicitAuth ? 'header' : 'cookie'; // flips to 'header' if DUPR prefers that
 
   // Auth context for one request: the user's own cookie when supplied, else the configured default.
@@ -76,34 +141,32 @@ export function createEngine(env = process.env) {
   };
   const defaultAuth = () => authFrom('');
 
-  async function searchPage(query, offset, auth, mode = authMode) {
+  const baseHeaders = {
+    accept: 'application/json',
+    'accept-language': 'en-US,en;q=0.9',
+    'cache-control': 'no-cache',
+    pragma: 'no-cache',
+    expires: '0',
+    origin: 'https://dashboard.dupr.com',
+    referer: 'https://dashboard.dupr.com/',
+    'user-agent': UA,
+    'x-dupr-client-capabilities': 'totp,webauthn',
+  };
+
+  async function callApi(url, { method = 'GET', body, headers: extraHeaders = {} } = {}, auth, mode = authMode) {
     const useHeader = mode === 'header';
     const authHeaders = useHeader
       ? { authorization: auth.explicitAuth || (auth.accessToken ? `Bearer ${auth.accessToken}` : '') }
       : (auth.cookie ? { cookie: auth.cookie } : {});
-    const res = await fetch(API, {
-      method: 'POST',
+    const res = await fetch(url, {
+      method,
       headers: {
-        'content-type': 'application/json; charset=UTF-8',
-        accept: 'application/json',
-        'accept-language': 'en-US,en;q=0.9',
-        'cache-control': 'no-cache',
-        pragma: 'no-cache',
-        expires: '0',
-        origin: 'https://dashboard.dupr.com',
-        referer: 'https://dashboard.dupr.com/',
-        'user-agent': UA,
-        'x-dupr-client-capabilities': 'totp,webauthn',
+        ...baseHeaders,
+        ...(body ? { 'content-type': 'application/json; charset=UTF-8' } : {}),
+        ...extraHeaders,
         ...authHeaders,
       },
-      body: JSON.stringify({
-        limit: PAGE_SIZE,
-        offset,
-        query,
-        exclude: [],
-        includeUnclaimedPlayers: true,
-        filter: { lat: cfg.lat, lng: cfg.lng, rating: { maxRating: null, minRating: null }, locationText: '' },
-      }),
+      body,
     });
     const text = await res.text();
     let json = null;
@@ -112,13 +175,134 @@ export function createEngine(env = process.env) {
   }
 
   // Cookie first; if DUPR rejects it, retry once with the access token as a bearer header.
-  async function searchWithAuth(query, offset, auth) {
-    const first = await searchPage(query, offset, auth);
+  async function callWithAuth(url, opts, auth) {
+    const first = await callApi(url, opts, auth);
     if (first.status !== 401 && first.status !== 403) return first;
     if (authMode !== 'cookie' || (!auth.accessToken && !auth.explicitAuth)) return first;
-    const second = await searchPage(query, offset, auth, 'header');
+    const second = await callApi(url, opts, auth, 'header');
     if (second.status === 200) { authMode = 'header'; return second; }
     return first;
+  }
+
+  const searchBody = (query, offset) => JSON.stringify({
+    limit: PAGE_SIZE,
+    offset,
+    query,
+    exclude: [],
+    includeUnclaimedPlayers: true,
+    filter: { lat: cfg.lat, lng: cfg.lng, rating: { maxRating: null, minRating: null }, locationText: '' },
+  });
+
+  const searchPage = (query, offset, auth, mode = authMode) =>
+    callApi(API, { method: 'POST', body: searchBody(query, offset) }, auth, mode);
+
+  const searchWithAuth = (query, offset, auth) =>
+    callWithAuth(API, { method: 'POST', body: searchBody(query, offset) }, auth);
+
+  const failureMessage = (json) => {
+    if (!json) return null;
+    const errors = Array.isArray(json.errors)
+      ? json.errors.map((e) => e?.message).filter(Boolean).join('; ')
+      : '';
+    return json.message || errors || json.error || null;
+  };
+
+  const failure = (res, auth) => {
+    const rejected = res.status === 401 || res.status === 403;
+    return {
+      status: res.status,
+      error: rejected ? 'cookie-rejected' : 'request-failed',
+      message: failureMessage(res.json) || `HTTP ${res.status}`,
+      hint: rejected
+        ? (auth.supplied
+          ? 'The cookie you supplied was rejected — it is probably expired; copy a fresh __Host-dupr_at from dashboard.dupr.com.'
+          : (auth.accessToken
+            ? 'The __Host-dupr_at access token was sent but rejected — it has probably expired; copy a fresh cookie.'
+            : 'Copy the __Host-dupr_at cookie (api.dupr.com) into the DUPR_COOKIE setting.'))
+        : undefined,
+    };
+  };
+
+  // DUPR's match-history/profile endpoints take the internal numeric user id, while search results
+  // expose the 6-character DUPR id. Map one to the other once per warm container.
+  async function resolveUserId(duprId, auth) {
+    const key = String(duprId);
+    const cached = idCache.get(key);
+    if (cached && Date.now() - cached.at < cfg.ttlMs) return cached.value;
+
+    const res = await callWithAuth(API_BY_DUPR, {
+      method: 'POST',
+      body: JSON.stringify({ duprId: key }),
+    }, auth);
+    if (res.status !== 200 || !res.json) return { ...failure(res, auth), duprId: key, userId: null };
+
+    const list = res.json.results
+      || (Array.isArray(res.json.result) ? res.json.result : res.json.result?.results)
+      || res.json.result?.hits
+      || [];
+    const first = Array.isArray(list) ? list[0] : null;
+    const value = { duprId: key, userId: first?.userId ?? first?.id ?? null, profile: first || null };
+    idCache.set(key, { at: Date.now(), value });
+    return value;
+  }
+
+  async function profile(duprId, auth = defaultAuth()) {
+    const key = String(duprId);
+    const cached = playerCache.get(key);
+    if (cached && Date.now() - cached.at < cfg.ttlMs) return { ...cached.value, cached: true };
+
+    const resolved = await resolveUserId(key, auth);
+    if (resolved.error) return resolved;
+
+    const userId = resolved.userId || key;
+    const res = await callWithAuth(API_PLAYER(userId), { method: 'GET' }, auth);
+    if (res.status !== 200 || !res.json) {
+      return { duprId: key, userId, ...failure(res, auth), player: null };
+    }
+    const player = res.json.result?.user || res.json.result || res.json.user || res.json;
+    const value = { duprId: key, userId, status: res.status, player, resolved: resolved.profile || null };
+    playerCache.set(key, { at: Date.now(), value });
+    return value;
+  }
+
+  async function matches(duprId, { offset = 0, limit = MATCH_PAGE, playerName = '' } = {}, auth = defaultAuth()) {
+    const key = String(duprId);
+    const off = Math.max(0, Number(offset) || 0);
+    const lim = Math.min(10, Math.max(1, Number(limit) || MATCH_PAGE));
+    const cacheKey = `${key}:${off}:${lim}:${String(playerName).toLowerCase()}`;
+    const cached = matchCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < cfg.ttlMs) return { ...cached.value, cached: true };
+
+    const resolved = await resolveUserId(key, auth);
+    if (resolved.error) {
+      return { duprId: key, offset: off, limit: lim, hits: [], total: 0, hasMore: false, ...resolved };
+    }
+
+    const userId = resolved.userId || key;
+    const res = await callWithAuth(API_MATCHES(userId), { method: 'POST', body: matchBody(off, lim) }, auth);
+    if (res.status !== 200 || !res.json || res.json.status === 'FAILURE') {
+      return { duprId: key, userId, offset: off, limit: lim, hits: [], total: 0, hasMore: false, ...failure(res, auth) };
+    }
+
+    // The player-history route answers with { result: { hits, hasMore } }; keep the admin/legacy
+    // { results: [{ hits }] } shape working too.
+    const result = res.json.result
+      || (Array.isArray(res.json.results) ? res.json.results[0] : null)
+      || res.json;
+    const rawHits = Array.isArray(result?.hits) ? result.hits : (Array.isArray(result) ? result : []);
+    const total = result?.total ?? null;
+    const hits = rawHits.map((match) => annotateMatch(match, userId, playerName));
+    const value = {
+      duprId: key,
+      userId,
+      offset: off,
+      limit: lim,
+      total,
+      hits,
+      hasMore: result?.hasMore ?? (total != null ? off + hits.length < total : hits.length >= lim),
+    };
+    matchCache.set(cacheKey, { at: Date.now(), value });
+    return value;
   }
 
   async function lookup(query, auth = defaultAuth()) {
@@ -167,6 +351,8 @@ export function createEngine(env = process.env) {
     cache,
     authFrom,
     lookup,
+    profile,
+    matches,
     get authMode() { return authMode; },
     async verify(auth = defaultAuth()) {
       if (!auth.cookie && !auth.explicitAuth) return { ok: false, reason: 'no-cookie', userCookie: auth.supplied };
@@ -252,6 +438,33 @@ export function createRouter(engine, { html = '', token = '', origin = '*' } = {
 
     if (method === 'GET' && pathname === '/api/status') return json(200, { ...engine.status(), userCookie: auth.supplied });
     if (method === 'GET' && pathname === '/api/verify') return json(200, await engine.verify(auth));
+
+    const matchHistoryRoute = /^\/api\/player\/([^/]+)\/matches$/.exec(pathname);
+    if (method === 'GET' && matchHistoryRoute) {
+      const duprId = decodeURIComponent(matchHistoryRoute[1]);
+      const offset = Math.max(0, Number(params.offset) || 0);
+      const limit = Math.min(50, Math.max(1, Number(params.limit) || 20));
+      const playerName = String(params.name || '').slice(0, 100);
+      try {
+        const payload = await engine.matches(duprId, { offset, limit, playerName }, auth);
+        const status = payload.error === 'cookie-rejected' ? 401 : payload.error ? 502 : 200;
+        return json(status, { ...payload, userCookie: auth.supplied });
+      } catch (e) {
+        return json(502, { error: 'request-failed', message: e.message });
+      }
+    }
+
+    const playerRoute = /^\/api\/player\/([^/]+)$/.exec(pathname);
+    if (method === 'GET' && playerRoute) {
+      const duprId = decodeURIComponent(playerRoute[1]);
+      try {
+        const payload = await engine.profile(duprId, auth);
+        const status = payload.error === 'cookie-rejected' ? 401 : payload.error ? 502 : 200;
+        return json(status, { ...payload, userCookie: auth.supplied });
+      } catch (e) {
+        return json(502, { error: 'request-failed', message: e.message });
+      }
+    }
 
     if (method === 'GET' && pathname === '/api/search') {
       const q = String(params.q || '').trim();
