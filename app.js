@@ -1234,10 +1234,32 @@ function renderActivityView(d) {
     removed: 'unlisted',
   };
 
+  // Group rows by the day the change was detected so dates are easy to scan.
+  const dayKey = (ts) => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+  const dayLabel = (ts) => {
+    const d = new Date(ts);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  let lastDay = '';
   const rows = log.map((l) => {
     const tone = cls(l.type) === 'j' ? '#2e7d32' : cls(l.type) === 'l' ? '#c62828' : '#ed6c02';
-    const meta = [l.ev, l.label].filter(Boolean).join(' \u00b7 ');
+    const meta = [l.label, l.ev].filter(Boolean).join(' \u00b7 ');
+    const day = dayKey(l.ts);
+    const separator = day !== lastDay
+      ? `<div class="activity-day-separator"><span>${esc(dayLabel(l.ts))}</span></div>`
+      : '';
+    lastDay = day;
     return `
+    ${separator}
     <div class="activity-log-row">
       <span class="act-icon material-symbols-outlined" style="color:${tone}">${ICON[l.type] || 'info'}</span>
       <span class="act-name">${highlightName(l.name)}</span>
