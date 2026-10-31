@@ -5,7 +5,8 @@
   "main": "watcher.js",
   "scripts": {
     "start": "node watcher.js",
-    "dupr": "node tools/dupr/server.mjs"
+    "dupr": "node tools/dupr/server.mjs",
+    "dupr:template": "node tools/dupr/build-template.mjs"
   },
   "dependencies": {
     "node-fetch": "^2.7.0"

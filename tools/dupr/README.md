@@ -46,6 +46,118 @@ The proxy sends the cookie on each request; if DUPR instead wants the access tok
 header it retries once with `Authorization: Bearer <__Host-dupr_at>` and keeps using that mode
 (you can force it with `DUPR_AUTH="Bearer …"`).
 
+### Using your own cookie from the page
+
+The cookie on the server is only a **default**. Any visitor can use their own session instead:
+
+* click **My cookie** in the header, paste `__Host-dupr_at=eyJ…` (or just the JWT), **Save**;
+* the page keeps it in `localStorage` and sends it on every call as the `x-dupr-cookie` header;
+* the pill next to the title shows `my cookie` vs `server cookie`, and **Test cookie** reports
+  `cookie works` / `cookie rejected (yours)` / `cookie rejected (server)`;
+* **Clear both** (or saving an empty value) drops back to the server's cookie.
+
+The override is per request — it is never written to a file and never replaces the server's cookie,
+so one person's expired session can't break anyone else. When a supplied cookie is rejected the
+error is explicit about it:
+
+```json
+{ "error": "cookie-rejected", "userCookie": true,
+  "hint": "The cookie you supplied was rejected — it is probably expired; copy a fresh __Host-dupr_at from dashboard.dupr.com." }
+```
+
+Server-side the same thing is just a header:
+
+```bash
+curl -H "x-dupr-cookie: __Host-dupr_at=eyJ…" "http://localhost:8787/api/search?q=Kha%20Lam"
+```
+
+## Deploying it as an AWS Lambda (console, no CLI)
+
+Two templates are **generated** from `app.mjs` + `lambda.mjs` + `index.html` (the page is inlined
+as base64, the code as `Code.ZipFile`). Re-build both after any change to those files:
+
+```bash
+npm run dupr:template
+#   aws/dupr-template.yaml        Lambda + public Function URL  (page at /, 60 s timeout)
+#   aws/dupr-apigw-template.yaml  Lambda + API Gateway HTTP API (page hosted elsewhere, 30 s cap)
+```
+
+### Option A — API Gateway, page hosted separately (recommended for sharing)
+
+Use `aws/dupr-apigw-template.yaml`. It creates a Lambda function, an **HTTP API** with a
+`$default` route/stage, and the `lambda:InvokeFunction` permission for `apigateway.amazonaws.com`.
+CORS is configured on the API (headers `content-type, x-dupr-token, x-dupr-cookie`).
+
+1. **CloudFormation → Create stack → With new resources** → upload `aws/dupr-apigw-template.yaml`.
+2. Parameters: `AllowedOrigin` = the origin that hosts your page (e.g. `https://you.github.io`) or
+   `*` while testing; `DuprCookie` **may be left empty** (each visitor then supplies their own via
+   the page's **My cookie** button); `ApiToken` = a long random string if you want `/api/*` locked.
+3. Create, then copy the **Outputs → `ApiBaseUrl`** value, e.g.
+   `https://abc123.execute-api.us-east-1.amazonaws.com`.
+4. Host `tools/dupr/index.html` anywhere static (GitHub Pages, S3 + CloudFront, Netlify…). Point it
+   at the API either way:
+   - open it once as `https://your.site/?api=https://abc123.execute-api.us-east-1.amazonaws.com`
+     (the value is saved in `localStorage` and the query string is then removed), or
+   - click **My cookie** → **Endpoint** field → paste → **Use endpoint**.
+   Leave the field empty when the Lambda serves the page itself (option B) — requests then go
+   to the same origin.
+5. If you set `ApiToken`, paste it once via **API key**.
+
+`/api/*` paths are identical in both options, so the same page works against either.
+
+> **30-second ceiling.** An API Gateway integration is cut off at 30 s no matter what the Lambda
+> timeout is, so this template defaults `Timeout: 29`, `MaxPages: 2`. For big rosters send a few
+> names per request (the page already splits long lists into batches of 8) or use option B.
+
+### Option B — Lambda Function URL (single artifact, 60 s timeout)
+
+Use `aws/dupr-template.yaml`:
+
+1. **CloudFormation → Create stack → With new resources (standard)**.
+2. **Template is ready → Upload a template file** → pick `aws/dupr-template.yaml`.
+3. Stack name, e.g. `courtreserve-dupr`, then fill the parameters:
+
+   | Parameter | What to put |
+   |---|---|
+   | `DuprCookie` | `__Host-dupr_at=eyJ…; __Host-dupr_rt=eyJ…` (or just the JWT) — stored as the function's `DUPR_COOKIE` |
+   | `ApiToken` | a long random string; then `/api/*` requires it in the `x-dupr-token` header. Leave blank only if you really want an open endpoint |
+   | `AllowedOrigin` | `*` for testing, or your site origin to restrict CORS |
+   | `States` / `SearchLat` / `SearchLng` | defaults are CT,MA and East Hartford |
+   | `MaxPages` / `CacheMinutes` / `ThrottleMs` | 3 / 360 / 250 are fine |
+   | `Timeout` / `MemorySize` | 60 s / 512 MB (a 14-name bulk run takes ~15–25 s) |
+
+4. Acknowledge the IAM capability (`AWS::IAM::Role`) and create. The **Outputs** tab gives you
+   `FunctionUrl`, `SearchEndpoint`, `BulkEndpoint`, `StatusEndpoint` and whether a token is required.
+5. Open `FunctionUrl` in a browser — that's the page. If you set `ApiToken`, click **API key** once
+   and paste it; it's kept in `localStorage`.
+
+If a Function URL answers `403 Forbidden` / `AccessDeniedException`, the function is missing the
+`lambda:InvokeFunctionUrl` statement (Permissions tab → *Add permissions* → **Function URL**, auth
+type `NONE`) or you are testing the URL of a different function.
+
+Calling it from another app:
+
+```bash
+# one name
+curl "$URL/api/search?q=John%20Doe" -H "x-dupr-token: $TOKEN"
+
+# a roster (one request, sequential upstream calls)
+curl "$URL/api/bulk" -H "x-dupr-token: $TOKEN" -H 'content-type: application/json' \
+     -d '{"names":["John Doe","Jane Doe"]}'
+
+# health / cache info
+curl "$URL/api/status" -H "x-dupr-token: $TOKEN"
+```
+
+Notes for the Lambda flavour:
+
+- The cookie lives in the function's environment (`NoEcho` parameter). Rotating it means a stack
+  update with a fresh `DuprCookie` — or move it to SSM SecureString and read it at cold start.
+  With the API Gateway template the cookie is optional: visitors can bring their own.
+- The cache is per warm container (no shared `/tmp`), so a cold start refetches. Fine for occasional use.
+- Cold start ≈ 0.5–1 s; the first bulk call after idle is the slow one.
+- The stack keeps one small log group (`/aws/lambda/<stack>-dupr-lookup`, 14-day retention).
+
 ## Using the page
 
 Styled after the DUPR dashboard (navy `#05155E`, accent `#3A79E0`, white cards, pill controls).

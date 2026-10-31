@@ -116,6 +116,12 @@
   .hint code, .hint strong { color: var(--navy); }
   .hint code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; font-size: .76rem; }
 
+  /* ── inline settings (cookie / api key) ── */
+  .settings { display: grid; gap: 10px; }
+  .settings .field { background: var(--navy-05); border-radius: 999px; padding: 4px 6px 4px 14px; display: flex; align-items: center; gap: 8px; }
+  .settings .field input { flex: 1; min-width: 0; width: auto; }
+  .settings-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
   /* ── results list ── */
   .results-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; margin: 2px 2px 10px; }
   .results-title { font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--navy-60); }
@@ -196,8 +202,40 @@
     </div>
     <div class="spacer"></div>
     <span class="pill" id="cookiePill">checking…</span>
+    <button class="ghost" id="cookieBtn" type="button" title="Use your own DUPR cookie instead of the server default">My cookie</button>
+    <button class="ghost" id="tokenBtn" type="button" title="Endpoint API key (x-dupr-token)">API key</button>
     <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
   </header>
+
+  <section class="card settings" id="settingsCard" hidden>
+    <div class="settings-row">
+      <span class="field">
+        <label for="cookieField">Your DUPR cookie</label>
+        <input id="cookieField" type="text" placeholder="__Host-dupr_at=eyJ…" autocomplete="off" spellcheck="false" />
+      </span>
+      <span class="field">
+        <label for="tokenField">API key</label>
+        <input id="tokenField" type="text" placeholder="x-dupr-token (optional)" autocomplete="off" spellcheck="false" />
+      </span>
+    </div>
+    <div class="settings-row">
+      <span class="field" style="flex:1">
+        <label for="apiField">Endpoint</label>
+        <input id="apiField" type="text" placeholder="https://abc123.execute-api.us-east-1.amazonaws.com" autocomplete="off" spellcheck="false" />
+      </span>
+      <button class="primary" id="apiSave" type="button" style="height:34px">Use endpoint</button>
+    </div>
+    <div class="settings-row">
+      <button class="primary" id="settingsSave" type="button" style="height:34px">Save</button>
+      <button class="ghost" id="settingsClear" type="button">Clear both</button>
+      <button class="ghost" id="settingsClose" type="button">Close</button>
+    </div>
+    <p class="hint">Kept in this browser only (<code>localStorage</code>). Your cookie is sent as
+      <code>x-dupr-cookie</code> and used just for your requests — leave it empty to fall back to the cookie
+      the server is configured with. <strong>Endpoint</strong> is only needed when this page is hosted
+      separately from the API: paste the stack's <code>ApiBaseUrl</code>/<code>FunctionUrl</code> output,
+      or open the page once with <code>?api=https://…</code>.</p>
+  </section>
 
   <section class="card">
     <div class="segmented" role="group" aria-label="Search mode">
@@ -261,12 +299,18 @@
   </section>
 
   <details class="help card">
-    <summary>Which cookies do I copy?</summary>
+    <summary>Cookies — server default or your own</summary>
+    <p style="margin:8px 0 0">By default every request uses the cookie the server is configured with.
+      If that one is missing or expired, click <strong>My cookie</strong> and paste your own
+      <code>__Host-dupr_at=eyJ…</code> (or just the JWT). It is kept in this browser's
+      <code>localStorage</code>, sent as the <code>x-dupr-cookie</code> header, and used only for your
+      requests — nothing is stored server-side. Press <strong>Test cookie</strong> to check whichever one
+      is in play; clear the field to fall back to the server default.</p>
     <ol>
       <li>Sign in at <code>https://dashboard.dupr.com</code>, open DevTools → <code>Application</code> → <code>Cookies</code>.</li>
       <li>Copy the two <code>__Host-</code> cookies whose domain is <code>api.dupr.com</code>:
         <code>__Host-dupr_at</code> (JWT access token — the important one) and <code>__Host-dupr_rt</code> (refresh token).</li>
-      <li>Paste them as one line into <code>tools/dupr/cookie.txt</code> (git-ignored) —
+      <li>Server-side default: paste them as one line into <code>tools/dupr/cookie.txt</code> (git-ignored) —
         <code>__Host-dupr_at=eyJ…; __Host-dupr_rt=eyJ…</code> — or set <code>DUPR_COOKIE</code>, then restart <code>npm run dupr</code>.</li>
     </ol>
     <p style="margin:8px 0 0">Analytics/payment cookies (<code>_ga</code>, <code>_fbp</code>, <code>__stripe_*</code>,
@@ -278,10 +322,14 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const el = {
-  cookiePill: $('cookiePill'), verifyBtn: $('verifyBtn'), modeSingle: $('modeSingle'), modeMulti: $('modeMulti'),
+  cookiePill: $('cookiePill'), verifyBtn: $('verifyBtn'), tokenBtn: $('tokenBtn'), cookieBtn: $('cookieBtn'),
+  modeSingle: $('modeSingle'), modeMulti: $('modeMulti'),
   singlePane: $('singlePane'), multiPane: $('multiPane'), singleInput: $('singleInput'), singleGo: $('singleGo'),
   names: $('names'), multiGo: $('multiGo'), clearBtn: $('clearBtn'), locInput: $('locInput'),
   sortRating: $('sortRating'), csvBtn: $('csvBtn'), banner: $('banner'),
+  settingsCard: $('settingsCard'), cookieField: $('cookieField'), tokenField: $('tokenField'),
+  settingsSave: $('settingsSave'), settingsClear: $('settingsClear'), settingsClose: $('settingsClose'),
+  apiField: $('apiField'), apiSave: $('apiSave'),
   resultsPane: $('resultsPane'), results: $('results'), resultsTitle: $('resultsTitle'), resultsMeta: $('resultsMeta'),
 };
 
@@ -298,6 +346,25 @@ el.names.value = localStorage.getItem('dupr_names_typed') || '';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+
+// When the Lambda is deployed with an ApiToken, every /api/* call must carry it.
+const apiToken = () => localStorage.getItem('dupr_token') || '';
+// Where the API lives. Empty means same origin (page served by the Lambda itself).
+// Set it once with ?api=https://… , or in the Endpoint field of the settings panel.
+const apiBase = () => (window.DUPR_API_BASE || localStorage.getItem('dupr_api_base') || '').replace(/\/+$/, '');
+// Optional per-visitor DUPR cookie; empty means "use the cookie the server is configured with".
+const myCookie = () => localStorage.getItem('dupr_cookie') || '';
+const apiFetch = (url, opts = {}) => {
+  const headers = { ...(opts.headers || {}) };
+  const t = apiToken();
+  if (t) headers['x-dupr-token'] = t;
+  const c = myCookie();
+  if (c) headers['x-dupr-cookie'] = c;
+  return fetch(apiBase() + url, { ...opts, headers });
+};
+const apiErrorText = (e) => (e.message === 'bad-token'
+  ? 'This endpoint requires an API key — click “API key” and paste the x-dupr-token value from the stack output.'
+  : e.message);
 
 // ── location filter (client side: DUPR ignores its own locationText param) ───
 const locTokens = () => el.locInput.value.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
@@ -392,9 +459,12 @@ function pill(kind, text) {
 
 async function checkStatus() {
   try {
-    const j = await (await fetch('/api/status')).json();
-    store.hasCookie = !!j.cookieSet;
-    pill(store.hasCookie ? '' : 'bad', store.hasCookie ? 'cookie set' : 'no cookie');
+    const res = await apiFetch('/api/status');
+    const j = await res.json();
+    if (res.status === 401) { pill('bad', 'needs api key'); return; }
+    store.hasCookie = !!j.cookieSet || !!j.userCookie;
+    if (j.userCookie) pill('ok', 'my cookie');
+    else pill(store.hasCookie ? '' : 'bad', store.hasCookie ? 'server cookie' : 'no cookie');
   } catch {
     pill('bad', 'proxy offline');
   }
@@ -404,8 +474,9 @@ async function verifyCookie() {
   el.verifyBtn.disabled = true;
   pill('', 'testing…');
   try {
-    const j = await (await fetch('/api/verify')).json();
-    pill(j.ok ? 'ok' : 'bad', j.ok ? 'cookie works' : (j.reason === 'cookie-rejected' ? 'cookie rejected' : (j.reason || 'failed')));
+    const j = await (await apiFetch('/api/verify')).json();
+    const suffix = j.userCookie ? ' (yours)' : '';
+    pill(j.ok ? 'ok' : 'bad', j.ok ? 'cookie works' + suffix : (j.reason === 'cookie-rejected' ? 'cookie rejected' + suffix : (j.reason || 'failed')));
   } catch {
     pill('bad', 'proxy offline');
   } finally {
@@ -428,7 +499,7 @@ async function runSingle() {
   el.singleGo.disabled = true;
   el.singleGo.innerHTML = '<span class="spin"></span>';
   try {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+    const res = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`);
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
     store.entries = [j];
@@ -436,7 +507,7 @@ async function runSingle() {
     if (j.error === 'cookie-rejected') showAuthBanner(j); else el.banner.innerHTML = '';
     render();
   } catch (e) {
-    el.banner.innerHTML = `<div class="banner err">${esc(e.message)}</div>`;
+    el.banner.innerHTML = `<div class="banner err">${esc(apiErrorText(e))}</div>`;
   } finally {
     el.singleGo.disabled = false;
     el.singleGo.textContent = 'Search';
@@ -448,16 +519,24 @@ async function runMulti() {
   if (!names.length) return;
   localStorage.setItem('dupr_names_typed', el.names.value);
   el.multiGo.disabled = true;
-  el.multiGo.innerHTML = '<span class="spin"></span> Looking up…';
+  // Batched so a long roster never trips API Gateway's 30 s integration limit.
+  const BATCH = 8;
+  const results = [];
   try {
-    const res = await fetch('/api/bulk', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ names }),
-    });
-    const j = await res.json();
-    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
-    store.entries = j.results || [];
+    for (let i = 0; i < names.length; i += BATCH) {
+      const batch = names.slice(i, i + BATCH);
+      el.multiGo.innerHTML = `<span class="spin"></span> ${Math.min(i + BATCH, names.length)}/${names.length}…`;
+      const res = await apiFetch('/api/bulk', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ names: batch }),
+      });
+      const j = await res.json();
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      results.push(...(j.results || []));
+      if (results.some((x) => x.error === 'cookie-rejected')) break;
+    }
+    store.entries = results;
     store.picks = {};
     const rejected = store.entries.find((x) => x.error === 'cookie-rejected');
     if (rejected) {
@@ -469,7 +548,7 @@ async function runMulti() {
     }
     render();
   } catch (e) {
-    el.banner.innerHTML = `<div class="banner err">${esc(e.message)}</div>`;
+    el.banner.innerHTML = `<div class="banner err">${esc(apiErrorText(e))}</div>`;
   } finally {
     el.multiGo.disabled = false;
     el.multiGo.textContent = 'Look up all';
@@ -521,6 +600,42 @@ el.names.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKe
 el.clearBtn.addEventListener('click', () => { el.names.value = ''; store.entries = []; store.picks = {}; el.resultsPane.hidden = true; el.csvBtn.disabled = true; });
 el.csvBtn.addEventListener('click', exportCsv);
 el.verifyBtn.addEventListener('click', verifyCookie);
+el.tokenBtn.addEventListener('click', () => {
+  el.settingsCard.hidden = false;
+  el.tokenField.focus();
+});
+el.cookieBtn.addEventListener('click', () => {
+  el.settingsCard.hidden = false;
+  el.cookieField.focus();
+});
+el.settingsSave.addEventListener('click', () => {
+  const cookie = el.cookieField.value.trim();
+  const token = el.tokenField.value.trim();
+  if (cookie) localStorage.setItem('dupr_cookie', cookie); else localStorage.removeItem('dupr_cookie');
+  if (token) localStorage.setItem('dupr_token', token); else localStorage.removeItem('dupr_token');
+  el.settingsCard.hidden = true;
+  el.banner.innerHTML = '';
+  checkStatus();
+});
+el.settingsClear.addEventListener('click', () => {
+  localStorage.removeItem('dupr_cookie');
+  localStorage.removeItem('dupr_token');
+  el.cookieField.value = '';
+  el.tokenField.value = '';
+  el.banner.innerHTML = '';
+  checkStatus();
+});
+el.settingsClose.addEventListener('click', () => { el.settingsCard.hidden = true; });
+el.apiSave.addEventListener('click', () => {
+  const next = el.apiField.value.trim().replace(/\/+$/, '');
+  if (next) localStorage.setItem('dupr_api_base', next); else localStorage.removeItem('dupr_api_base');
+  el.apiField.value = apiBase();
+  el.banner.innerHTML = '';
+  store.entries = [];
+  el.resultsPane.hidden = true;
+  checkStatus();
+});
+el.apiField.addEventListener('keydown', (e) => { if (e.key === 'Enter') el.apiSave.click(); });
 el.locInput.addEventListener('input', () => store.entries.length && render());
 el.sortRating.addEventListener('change', () => store.entries.length && render());
 
@@ -532,6 +647,22 @@ el.results.addEventListener('click', (e) => {
 });
 
 el.singleInput.value = localStorage.getItem('dupr_single') || '';
+
+// ?api=https://… sets the endpoint once, then leaves the address bar clean.
+try {
+  const q = new URLSearchParams(location.search);
+  const fromQuery = (q.get('api') || '').trim();
+  if (fromQuery) {
+    localStorage.setItem('dupr_api_base', fromQuery.replace(/\/+$/, ''));
+    q.delete('api');
+    const rest = q.toString();
+    history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
+  }
+} catch { /* ignore */ }
+
+el.cookieField.value = myCookie();
+el.tokenField.value = apiToken();
+el.apiField.value = apiBase();
 checkStatus();
 setMode(store.mode);
 </script>
