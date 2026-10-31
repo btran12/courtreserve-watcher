@@ -50,9 +50,9 @@ header it retries once with `Authorization: Bearer <__Host-dupr_at>` and keeps u
 
 The cookie on the server is only a **default**. Any visitor can use their own session instead:
 
-* click **My cookie** in the header, paste `__Host-dupr_at=eyJ…` (or just the JWT), **Save**;
+* click **Settings** in the header, paste `__Host-dupr_at=eyJ…` (or just the JWT), **Save**;
 * the page keeps it in `localStorage` and sends it on every call as the `x-dupr-cookie` header;
-* the pill next to the title shows `my cookie` vs `server cookie`, and **Test cookie** reports
+* the pill next to the title shows `my cookie` vs `server cookie`, and **Test cookie** (in the modal) reports
   `cookie works` / `cookie rejected (yours)` / `cookie rejected (server)`;
 * **Clear both** (or saving an empty value) drops back to the server's cookie.
 
@@ -73,13 +73,13 @@ curl -H "x-dupr-cookie: __Host-dupr_at=eyJ…" "http://localhost:8787/api/search
 
 ## Deploying it as an AWS Lambda (console, no CLI)
 
-Two templates are **generated** from `app.mjs` + `lambda.mjs` + `index.html` (the page is inlined
-as base64, the code as `Code.ZipFile`). Re-build both after any change to those files:
+Two templates are **generated** from `app.mjs` + `lambda.mjs` (the code is inlined as
+`Code.ZipFile`; the page is not bundled). Re-build both after any change to those files:
 
 ```bash
 npm run dupr:template
-#   aws/dupr-template.yaml        Lambda + public Function URL  (page at /, 60 s timeout)
-#   aws/dupr-apigw-template.yaml  Lambda + API Gateway HTTP API (page hosted elsewhere, 30 s cap)
+#   aws/dupr-template.yaml        Lambda + public Function URL  (API only, 60 s timeout)
+#   aws/dupr-apigw-template.yaml  Lambda + API Gateway HTTP API (API only, 30 s cap)
 ```
 
 ### Option A — API Gateway, page hosted separately (recommended for sharing)
@@ -91,17 +91,17 @@ CORS is configured on the API (headers `content-type, x-dupr-token, x-dupr-cooki
 1. **CloudFormation → Create stack → With new resources** → upload `aws/dupr-apigw-template.yaml`.
 2. Parameters: `AllowedOrigin` = the origin that hosts your page (e.g. `https://you.github.io`) or
    `*` while testing; `DuprCookie` **may be left empty** (each visitor then supplies their own via
-   the page's **My cookie** button); `ApiToken` = a long random string if you want `/api/*` locked.
+   the page's **Settings** modal); `ApiToken` = a long random string if you want `/api/*` locked.
 3. Create, then copy the **Outputs → `ApiBaseUrl`** value, e.g.
    `https://abc123.execute-api.us-east-1.amazonaws.com`.
-4. Host `tools/dupr/index.html` anywhere static (GitHub Pages, S3 + CloudFront, Netlify…). Point it
-   at the API either way:
-   - open it once as `https://your.site/?api=https://abc123.execute-api.us-east-1.amazonaws.com`
-     (the value is saved in `localStorage` and the query string is then removed), or
-   - click **My cookie** → **Endpoint** field → paste → **Use endpoint**.
-   Leave the field empty when the Lambda serves the page itself (option B) — requests then go
-   to the same origin.
-5. If you set `ApiToken`, paste it once via **API key**.
+4. Host `tools/dupr/index.html` anywhere static (GitHub Pages, S3 + CloudFront, Netlify…). The page
+   already defaults to `https://5me448fxzl.execute-api.us-east-1.amazonaws.com`, so no endpoint
+   setup is needed. To point it at a different stack, open it once as
+   `https://your.site/?api=https://abc123.execute-api.us-east-1.amazonaws.com` (the value is saved
+   in `localStorage` and the query string is then removed).
+5. If you set `ApiToken`, supply it once via **Settings** → **API key**, or in the URL:
+   `https://your.site/?key=YOUR_TOKEN` (also accepted as `?token=…`). It is saved in `localStorage`
+   and then removed from the address bar.
 
 `/api/*` paths are identical in both options, so the same page works against either.
 
@@ -128,8 +128,9 @@ Use `aws/dupr-template.yaml`:
 
 4. Acknowledge the IAM capability (`AWS::IAM::Role`) and create. The **Outputs** tab gives you
    `FunctionUrl`, `SearchEndpoint`, `BulkEndpoint`, `StatusEndpoint` and whether a token is required.
-5. Open `FunctionUrl` in a browser — that's the page. If you set `ApiToken`, click **API key** once
-   and paste it; it's kept in `localStorage`.
+5. Host `tools/dupr/index.html` separately (as in Option A, step 4), then open it once with
+   `?api=<FunctionUrl>` so it talks to this stack. If you set `ApiToken`, also add
+   `&key=YOUR_TOKEN` or paste it via **Settings**; it's kept in `localStorage`.
 
 If a Function URL answers `403 Forbidden` / `AccessDeniedException`, the function is missing the
 `lambda:InvokeFunctionUrl` statement (Permissions tab → *Add permissions* → **Function URL**, auth
@@ -179,7 +180,7 @@ Styled after the DUPR dashboard (navy `#05155E`, accent `#3A79E0`, white cards, 
   Filtering runs client-side because DUPR's own `filter.locationText` parameter is ignored server-side
   (verified: identical totals for `""`, `"CT"`, `"Connecticut"`). Only the first 30 hits per name are
   fetched (`DUPR_MAX_PAGES`), so for very common names widen that if the local match is not in the top 3 pages.
-- **Sort by doubles** re-orders rows; **Export CSV** downloads the selected profile per requested name.
+- **Sort by doubles** re-orders rows.
 
 ## Notes
 

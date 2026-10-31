@@ -116,9 +116,27 @@
   .hint code, .hint strong { color: var(--navy); }
   .hint code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; font-size: .76rem; }
 
-  /* ── inline settings (cookie / api key) ── */
+  /* ── settings modal (cookie / api key / help) ── */
+  dialog.modal {
+    width: min(580px, calc(100vw - 28px));
+    max-height: min(86vh, 760px);
+    margin: auto; padding: 0; border: 0; border-radius: 20px;
+    background: var(--surface); color: var(--navy);
+    box-shadow: 0 24px 70px -18px rgba(5, 21, 94, .5);
+  }
+  dialog.modal::backdrop { background: rgba(5, 21, 94, .45); backdrop-filter: blur(2px); }
+  .modal-head { display: flex; align-items: center; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+  .modal-head h2 { margin: 0; font-size: 1rem; letter-spacing: -.01em; }
+  .modal-head .spacer { flex: 1; }
+  .icon-btn {
+    width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%;
+    background: var(--surface); color: var(--navy); font: inherit; font-size: 1.1rem;
+    line-height: 1; cursor: pointer;
+  }
+  .icon-btn:hover { background: var(--navy-05); }
+  .modal-body { display: grid; gap: 14px; padding: 18px; overflow: auto; max-height: calc(86vh - 64px); }
   .settings { display: grid; gap: 10px; }
-  .settings .field { background: var(--navy-05); border-radius: 999px; padding: 4px 6px 4px 14px; display: flex; align-items: center; gap: 8px; }
+  .settings .field { width: 100%; background: var(--navy-05); border-radius: 999px; padding: 4px 6px 4px 14px; display: flex; align-items: center; gap: 8px; }
   .settings .field input { flex: 1; min-width: 0; width: auto; }
   .settings-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
@@ -176,7 +194,7 @@
   .spin { width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: inline-block; animation: spin .7s linear infinite; vertical-align: -1px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  details.help { font-size: .82rem; color: var(--muted); }
+  details.help { margin: 0; padding-top: 14px; border-top: 1px solid var(--line); font-size: .82rem; color: var(--muted); }
   details.help summary { cursor: pointer; font-weight: 600; color: var(--navy); }
   details.help ol { margin: 8px 0 0; padding-left: 20px; }
   details.help code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; color: var(--navy); }
@@ -202,40 +220,8 @@
     </div>
     <div class="spacer"></div>
     <span class="pill" id="cookiePill">checking…</span>
-    <button class="ghost" id="cookieBtn" type="button" title="Use your own DUPR cookie instead of the server default">My cookie</button>
-    <button class="ghost" id="tokenBtn" type="button" title="Endpoint API key (x-dupr-token)">API key</button>
-    <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
+    <button class="ghost" id="settingsBtn" type="button" title="Cookie, API key and help">Settings</button>
   </header>
-
-  <section class="card settings" id="settingsCard" hidden>
-    <div class="settings-row">
-      <span class="field">
-        <label for="cookieField">Your DUPR cookie</label>
-        <input id="cookieField" type="text" placeholder="__Host-dupr_at=eyJ…" autocomplete="off" spellcheck="false" />
-      </span>
-      <span class="field">
-        <label for="tokenField">API key</label>
-        <input id="tokenField" type="text" placeholder="x-dupr-token (optional)" autocomplete="off" spellcheck="false" />
-      </span>
-    </div>
-    <div class="settings-row">
-      <span class="field" style="flex:1">
-        <label for="apiField">Endpoint</label>
-        <input id="apiField" type="text" placeholder="https://abc123.execute-api.us-east-1.amazonaws.com" autocomplete="off" spellcheck="false" />
-      </span>
-      <button class="primary" id="apiSave" type="button" style="height:34px">Use endpoint</button>
-    </div>
-    <div class="settings-row">
-      <button class="primary" id="settingsSave" type="button" style="height:34px">Save</button>
-      <button class="ghost" id="settingsClear" type="button">Clear both</button>
-      <button class="ghost" id="settingsClose" type="button">Close</button>
-    </div>
-    <p class="hint">Kept in this browser only (<code>localStorage</code>). Your cookie is sent as
-      <code>x-dupr-cookie</code> and used just for your requests — leave it empty to fall back to the cookie
-      the server is configured with. <strong>Endpoint</strong> is only needed when this page is hosted
-      separately from the API: paste the stack's <code>ApiBaseUrl</code>/<code>FunctionUrl</code> output,
-      or open the page once with <code>?api=https://…</code>.</p>
-  </section>
 
   <section class="card">
     <div class="segmented" role="group" aria-label="Search mode">
@@ -278,8 +264,6 @@
         <option value="New York, NY"></option>
       </datalist>
       <label class="switch"><input type="checkbox" id="sortRating" /> sort by doubles</label>
-      <div class="spacer"></div>
-      <button class="ghost" id="csvBtn" type="button" disabled>Export CSV</button>
     </div>
     <p class="hint">
       Location matches the address DUPR returns (e.g. <em>Granby, CT, US</em>): a <strong>2-letter</strong> entry must equal the state code,
@@ -297,39 +281,67 @@
     </div>
     <div id="results"></div>
   </section>
-
-  <details class="help card">
-    <summary>Cookies — server default or your own</summary>
-    <p style="margin:8px 0 0">By default every request uses the cookie the server is configured with.
-      If that one is missing or expired, click <strong>My cookie</strong> and paste your own
-      <code>__Host-dupr_at=eyJ…</code> (or just the JWT). It is kept in this browser's
-      <code>localStorage</code>, sent as the <code>x-dupr-cookie</code> header, and used only for your
-      requests — nothing is stored server-side. Press <strong>Test cookie</strong> to check whichever one
-      is in play; clear the field to fall back to the server default.</p>
-    <ol>
-      <li>Sign in at <code>https://dashboard.dupr.com</code>, open DevTools → <code>Application</code> → <code>Cookies</code>.</li>
-      <li>Copy the two <code>__Host-</code> cookies whose domain is <code>api.dupr.com</code>:
-        <code>__Host-dupr_at</code> (JWT access token — the important one) and <code>__Host-dupr_rt</code> (refresh token).</li>
-      <li>Server-side default: paste them as one line into <code>tools/dupr/cookie.txt</code> (git-ignored) —
-        <code>__Host-dupr_at=eyJ…; __Host-dupr_rt=eyJ…</code> — or set <code>DUPR_COOKIE</code>, then restart <code>npm run dupr</code>.</li>
-    </ol>
-    <p style="margin:8px 0 0">Analytics/payment cookies (<code>_ga</code>, <code>_fbp</code>, <code>__stripe_*</code>,
-      <code>ab.storage.*</code>, media/Facebook cookies…) are ignored. The access token lasts ~30 days; when DUPR
-      rejects it, copy a fresh one.</p>
-  </details>
 </div>
+
+<dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle">
+  <div class="modal-head">
+    <h2 id="settingsTitle">Settings</h2>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="settingsClose" type="button" aria-label="Close settings">&times;</button>
+  </div>
+  <div class="modal-body">
+    <div class="settings">
+      <span class="field">
+        <label for="cookieField">Your DUPR cookie</label>
+        <input id="cookieField" type="text" placeholder="__Host-dupr_at=eyJ…" autocomplete="off" spellcheck="false" />
+      </span>
+      <span class="field">
+        <label for="tokenField">API key</label>
+        <input id="tokenField" type="text" placeholder="x-dupr-token (optional)" autocomplete="off" spellcheck="false" />
+      </span>
+    </div>
+    <p class="hint">Kept in this browser only (<code>localStorage</code>). Your cookie is sent as
+      <code>x-dupr-cookie</code> and used just for your requests — leave it empty to fall back to the cookie
+      the server is configured with. The API key can also be supplied once in the URL:
+      <code>?key=…</code> (or <code>?token=…</code>); it is saved locally and then removed from the
+      address bar.</p>
+    <div class="settings-row">
+      <button class="primary" id="settingsSave" type="button" style="height:34px">Save</button>
+      <button class="ghost" id="settingsClear" type="button">Clear both</button>
+      <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
+    </div>
+    <details class="help">
+      <summary>Cookies — server default or your own</summary>
+      <p style="margin:8px 0 0">By default every request uses the cookie the server is configured with.
+        If that one is missing or expired, paste your own <code>__Host-dupr_at=eyJ…</code> (or just the
+        JWT) into the field above. It is kept in this browser's
+        <code>localStorage</code>, sent as the <code>x-dupr-cookie</code> header, and used only for your
+        requests — nothing is stored server-side. Press <strong>Test cookie</strong> to check whichever one
+        is in play; clear the field to fall back to the server default.</p>
+      <ol>
+        <li>Sign in at <code>https://dashboard.dupr.com</code>, open DevTools → <code>Application</code> → <code>Cookies</code>.</li>
+        <li>Copy the two <code>__Host-</code> cookies whose domain is <code>api.dupr.com</code>:
+          <code>__Host-dupr_at</code> (JWT access token — the important one) and <code>__Host-dupr_rt</code> (refresh token).</li>
+        <li>Server-side default: paste them as one line into <code>tools/dupr/cookie.txt</code> (git-ignored) —
+          <code>__Host-dupr_at=eyJ…; __Host-dupr_rt=eyJ…</code> — or set <code>DUPR_COOKIE</code>, then restart <code>npm run dupr</code>.</li>
+      </ol>
+      <p style="margin:8px 0 0">Analytics/payment cookies (<code>_ga</code>, <code>_fbp</code>, <code>__stripe_*</code>,
+        <code>ab.storage.*</code>, media/Facebook cookies…) are ignored. The access token lasts ~30 days; when DUPR
+        rejects it, copy a fresh one.</p>
+    </details>
+  </div>
+</dialog>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const el = {
-  cookiePill: $('cookiePill'), verifyBtn: $('verifyBtn'), tokenBtn: $('tokenBtn'), cookieBtn: $('cookieBtn'),
+  cookiePill: $('cookiePill'), verifyBtn: $('verifyBtn'), settingsBtn: $('settingsBtn'), settingsModal: $('settingsModal'),
   modeSingle: $('modeSingle'), modeMulti: $('modeMulti'),
   singlePane: $('singlePane'), multiPane: $('multiPane'), singleInput: $('singleInput'), singleGo: $('singleGo'),
   names: $('names'), multiGo: $('multiGo'), clearBtn: $('clearBtn'), locInput: $('locInput'),
-  sortRating: $('sortRating'), csvBtn: $('csvBtn'), banner: $('banner'),
-  settingsCard: $('settingsCard'), cookieField: $('cookieField'), tokenField: $('tokenField'),
+  sortRating: $('sortRating'), banner: $('banner'),
+  cookieField: $('cookieField'), tokenField: $('tokenField'),
   settingsSave: $('settingsSave'), settingsClear: $('settingsClear'), settingsClose: $('settingsClose'),
-  apiField: $('apiField'), apiSave: $('apiSave'),
   resultsPane: $('resultsPane'), results: $('results'), resultsTitle: $('resultsTitle'), resultsMeta: $('resultsMeta'),
 };
 
@@ -349,9 +361,10 @@ const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2
 
 // When the Lambda is deployed with an ApiToken, every /api/* call must carry it.
 const apiToken = () => localStorage.getItem('dupr_token') || '';
-// Where the API lives. Empty means same origin (page served by the Lambda itself).
-// Set it once with ?api=https://… , or in the Endpoint field of the settings panel.
-const apiBase = () => (window.DUPR_API_BASE || localStorage.getItem('dupr_api_base') || '').replace(/\/+$/, '');
+// Where the API lives. Defaults to the deployed endpoint; override once with ?api=https://…
+// (or window.DUPR_API_BASE) when hosting against a different stack.
+const DEFAULT_API_BASE = 'https://5me448fxzl.execute-api.us-east-1.amazonaws.com';
+const apiBase = () => (window.DUPR_API_BASE || localStorage.getItem('dupr_api_base') || DEFAULT_API_BASE).replace(/\/+$/, '');
 // Optional per-visitor DUPR cookie; empty means "use the cookie the server is configured with".
 const myCookie = () => localStorage.getItem('dupr_cookie') || '';
 const apiFetch = (url, opts = {}) => {
@@ -363,7 +376,7 @@ const apiFetch = (url, opts = {}) => {
   return fetch(apiBase() + url, { ...opts, headers });
 };
 const apiErrorText = (e) => (e.message === 'bad-token'
-  ? 'This endpoint requires an API key — click “API key” and paste the x-dupr-token value from the stack output.'
+  ? 'This endpoint requires an API key — open “Settings” and paste the x-dupr-token value from the stack output.'
   : e.message);
 
 // ── location filter (client side: DUPR ignores its own locationText param) ───
@@ -448,7 +461,6 @@ function render() {
 
   el.results.innerHTML = blocks.join('') || '<div class="card empty-state"><strong>Nothing yet</strong>Search a name above, or switch to “Multiple names” to look up a roster.</div>';
   el.resultsPane.hidden = false;
-  el.csvBtn.disabled = !store.entries.length;
 }
 
 // ── proxy status ─────────────────────────────────────────────────────────────
@@ -566,28 +578,7 @@ function setMode(mode) {
   store.entries = [];
   store.picks = {};
   el.resultsPane.hidden = true;
-  el.csvBtn.disabled = true;
   if (mode === 'single') setTimeout(() => el.singleInput.focus(), 30);
-}
-
-function exportCsv() {
-  const tokens = locTokens();
-  const head = ['requested_name', 'dupr_name', 'dupr_id', 'location', 'age', 'doubles', 'doubles_reliability', 'singles', 'singles_reliability'];
-  const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [head.join(',')];
-  for (const entry of store.entries) {
-    const hit = (entry.hits || []).find((h) => h.id === store.picks[entry.query])
-      || (entry.hits || []).filter((h) => matchesLocation(h, tokens))[0];
-    lines.push(hit
-      ? [q(entry.query), q(hit.name), q(hit.id), q(hit.address), q(hit.age), q(hit.doubles ?? 'NR'), q(hit.doublesReliability ?? ''), q(hit.singles ?? 'NR'), q(hit.singlesReliability ?? '')].join(',')
-      : [q(entry.query), '', '', '', '', '', '', '', ''].join(','));
-  }
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `dupr-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
 }
 
 // ── events ───────────────────────────────────────────────────────────────────
@@ -597,23 +588,21 @@ el.singleGo.addEventListener('click', runSingle);
 el.singleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSingle(); });
 el.multiGo.addEventListener('click', runMulti);
 el.names.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runMulti(); });
-el.clearBtn.addEventListener('click', () => { el.names.value = ''; store.entries = []; store.picks = {}; el.resultsPane.hidden = true; el.csvBtn.disabled = true; });
-el.csvBtn.addEventListener('click', exportCsv);
+el.clearBtn.addEventListener('click', () => { el.names.value = ''; store.entries = []; store.picks = {}; el.resultsPane.hidden = true; });
 el.verifyBtn.addEventListener('click', verifyCookie);
-el.tokenBtn.addEventListener('click', () => {
-  el.settingsCard.hidden = false;
-  el.tokenField.focus();
-});
-el.cookieBtn.addEventListener('click', () => {
-  el.settingsCard.hidden = false;
+el.settingsBtn.addEventListener('click', () => {
+  if (!el.settingsModal.open) el.settingsModal.showModal();
   el.cookieField.focus();
+});
+el.settingsModal.addEventListener('click', (e) => {
+  if (e.target === el.settingsModal) el.settingsModal.close();
 });
 el.settingsSave.addEventListener('click', () => {
   const cookie = el.cookieField.value.trim();
   const token = el.tokenField.value.trim();
   if (cookie) localStorage.setItem('dupr_cookie', cookie); else localStorage.removeItem('dupr_cookie');
   if (token) localStorage.setItem('dupr_token', token); else localStorage.removeItem('dupr_token');
-  el.settingsCard.hidden = true;
+  el.settingsModal.close();
   el.banner.innerHTML = '';
   checkStatus();
 });
@@ -622,20 +611,11 @@ el.settingsClear.addEventListener('click', () => {
   localStorage.removeItem('dupr_token');
   el.cookieField.value = '';
   el.tokenField.value = '';
+  el.cookieField.focus();
   el.banner.innerHTML = '';
   checkStatus();
 });
-el.settingsClose.addEventListener('click', () => { el.settingsCard.hidden = true; });
-el.apiSave.addEventListener('click', () => {
-  const next = el.apiField.value.trim().replace(/\/+$/, '');
-  if (next) localStorage.setItem('dupr_api_base', next); else localStorage.removeItem('dupr_api_base');
-  el.apiField.value = apiBase();
-  el.banner.innerHTML = '';
-  store.entries = [];
-  el.resultsPane.hidden = true;
-  checkStatus();
-});
-el.apiField.addEventListener('keydown', (e) => { if (e.key === 'Enter') el.apiSave.click(); });
+el.settingsClose.addEventListener('click', () => el.settingsModal.close());
 el.locInput.addEventListener('input', () => store.entries.length && render());
 el.sortRating.addEventListener('change', () => store.entries.length && render());
 
@@ -648,13 +628,26 @@ el.results.addEventListener('click', (e) => {
 
 el.singleInput.value = localStorage.getItem('dupr_single') || '';
 
-// ?api=https://… sets the endpoint once, then leaves the address bar clean.
+// One-time URL params, then leave the address bar clean:
+//   ?api=https://…   override the API endpoint
+//   ?key=… / ?token=… supply the x-dupr-token API key
 try {
   const q = new URLSearchParams(location.search);
-  const fromQuery = (q.get('api') || '').trim();
-  if (fromQuery) {
-    localStorage.setItem('dupr_api_base', fromQuery.replace(/\/+$/, ''));
+  let changed = false;
+  const fromApi = (q.get('api') || '').trim();
+  if (fromApi) {
+    localStorage.setItem('dupr_api_base', fromApi.replace(/\/+$/, ''));
     q.delete('api');
+    changed = true;
+  }
+  const fromKey = (q.get('key') || q.get('token') || '').trim();
+  if (fromKey) {
+    localStorage.setItem('dupr_token', fromKey);
+    q.delete('key');
+    q.delete('token');
+    changed = true;
+  }
+  if (changed) {
     const rest = q.toString();
     history.replaceState(null, '', location.pathname + (rest ? '?' + rest : '') + location.hash);
   }
@@ -662,7 +655,6 @@ try {
 
 el.cookieField.value = myCookie();
 el.tokenField.value = apiToken();
-el.apiField.value = apiBase();
 checkStatus();
 setMode(store.mode);
 </script>
