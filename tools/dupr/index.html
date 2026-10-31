@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>DUPR lookup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -31,15 +31,19 @@
     --radius-card: 16px;
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   html, body { margin: 0; }
+  button, .row, .switch { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+  button, input[type="search"] { -webkit-appearance: none; appearance: none; }
   body {
     background: var(--page);
     color: var(--navy);
     font: 15px/1.45 Inter, Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
     padding: 22px 18px 72px;
   }
-  .wrap { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+  .wrap { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
   /* ── header ── */
   header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
@@ -115,6 +119,9 @@
   .hint { margin: 10px 0 0; font-size: .78rem; color: var(--muted); }
   .hint code, .hint strong { color: var(--navy); }
   .hint code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; font-size: .76rem; }
+  .hint code, details.help code { overflow-wrap: anywhere; }
+  .multi-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .multi-actions .primary { height: 42px; }
 
   /* ── settings modal (cookie / api key / help) ── */
   dialog.modal {
@@ -126,7 +133,7 @@
   }
   dialog.modal::backdrop { background: rgba(5, 21, 94, .45); backdrop-filter: blur(2px); }
   .modal-head { display: flex; align-items: center; gap: 12px; padding: 15px 18px; border-bottom: 1px solid var(--line); }
-  .modal-head h2 { margin: 0; font-size: 1rem; letter-spacing: -.01em; }
+  .modal-head h2 { margin: 0; font-size: 1rem; letter-spacing: -.01em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .modal-head .spacer { flex: 1; }
   .icon-btn {
     width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%;
@@ -134,11 +141,12 @@
     line-height: 1; cursor: pointer;
   }
   .icon-btn:hover { background: var(--navy-05); }
-  .modal-body { display: grid; gap: 14px; padding: 18px; overflow: auto; max-height: calc(86vh - 64px); }
+  .modal-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 18px; overflow: auto; max-height: calc(86vh - 64px); min-width: 0; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .settings { display: grid; gap: 10px; }
   .settings .field { width: 100%; background: var(--navy-05); border-radius: 999px; padding: 4px 6px 4px 14px; display: flex; align-items: center; gap: 8px; }
   .settings .field input { flex: 1; min-width: 0; width: auto; }
   .settings-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .settings-row .primary { height: 34px; }
 
   /* ── player profile modal ── */
   .player-modal { width: min(680px, calc(100vw - 28px)); }
@@ -155,8 +163,8 @@
   .player-section { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
   .player-section h3 { margin: 0; font-size: .78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--navy-60); }
   .player-section span { font-size: .78rem; color: var(--muted); }
-  .match-list { display: grid; gap: 8px; }
-  .match { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+  .match-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .match { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
   .match-top { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--muted); }
   .match-event { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .match-result { flex: 0 0 auto; border-radius: 999px; padding: 2px 8px; font-size: .68rem; font-weight: 700; letter-spacing: .04em; }
@@ -234,15 +242,124 @@
   details.help ol { margin: 8px 0 0; padding-left: 20px; }
   details.help code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; color: var(--navy); }
 
+  /* ── mobile ─────────────────────────────────────────────────────────────── */
   @media (max-width: 640px) {
-    body { padding: 16px 12px 60px; }
-    .search-input { padding-right: 108px; }
-    .row { flex-wrap: wrap; }
-    .ratings { width: 100%; padding-left: 54px; }
-    .who-sub { white-space: normal; }
-    .field input { width: 132px; }
+    body {
+      padding: 16px max(12px, env(safe-area-inset-right)) calc(56px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    }
+    .wrap { gap: 14px; }
+
+    /* header: brand on its own line, status + settings underneath */
+    header { gap: 10px 8px; }
+    .brand { flex: 1 1 100%; }
+    header > .spacer { display: none; }
+    #cookiePill { flex: 1 1 auto; justify-content: center; min-height: 40px; }
+    #settingsBtn { flex: 0 0 auto; min-height: 40px; padding: 0 16px; }
+
+    .card { padding: 14px; border-radius: 14px; }
+
+    /* controls fill the width and stay finger-sized */
+    .segmented { display: flex; width: 100%; }
+    .segmented button { flex: 1 1 0; min-height: 42px; padding: 8px 10px; font-size: .84rem; }
+
+    .search-row { display: grid; gap: 10px; margin-top: 12px; }
+    .search-row svg { top: 26px; left: 16px; }
+    .search-input {
+      height: 52px; padding: 0 18px 0 44px;
+      font-size: 16px; /* 16px stops iOS from zooming into the field */
+    }
+    .search-go { position: static; width: 100%; height: 46px; font-size: .92rem; }
+
+    textarea { min-height: 128px; font-size: 16px; line-height: 1.5; }
+    .multi-actions { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
+    .multi-actions .primary, .multi-actions .ghost { height: 46px; }
+
+    .filters { flex-direction: column; align-items: stretch; gap: 8px; }
+    .filters .field { width: 100%; border-radius: 12px; padding: 6px 8px 6px 14px; }
+    .filters .field input { flex: 1 1 auto; min-width: 0; width: auto; height: 36px; font-size: 16px; }
+    .switch { min-height: 40px; font-size: .86rem; }
+    .switch input { width: 20px; height: 20px; }
+
+    .hint { font-size: .8rem; }
+    .ghost { min-height: 40px; padding: 8px 16px; }
+
+    /* results: identity on line one, ratings on line two */
+    .row { flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 12px 14px; }
+    .who { flex: 1 1 0; min-width: 0; }
+    .who-name { overflow-wrap: anywhere; }
+    .who-sub { white-space: normal; overflow-wrap: anywhere; }
+    .ratings { flex: 1 1 100%; flex-wrap: wrap; padding-left: 54px; gap: 6px; }
+    .rating { padding: 3px 9px; font-size: .76rem; }
     .selected-mark { display: none; }
     .row.selected { box-shadow: inset 3px 0 0 var(--accent); }
+    .results-head { gap: 4px 10px; margin-bottom: 8px; }
+
+    /* modals become bottom sheets */
+    dialog.modal {
+      width: 100%; max-width: 100%; max-height: 92dvh;
+      margin: auto 0 0; border-radius: 20px 20px 0 0;
+    }
+    dialog.modal::before {
+      content: ""; display: block; flex: 0 0 auto;
+      width: 40px; height: 4px; margin: 8px auto 0;
+      border-radius: 999px; background: var(--navy-10);
+    }
+    dialog.modal[open] { display: flex; flex-direction: column; }
+    .modal-head { padding: 12px 16px; }
+    .modal-head h2 { font-size: .98rem; }
+    .icon-btn { width: 40px; height: 40px; flex: 0 0 auto; }
+    .modal-body {
+      flex: 1 1 auto; min-height: 0; max-height: none; width: 100%;
+      padding: 16px max(16px, env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    }
+
+    .settings .field { flex-direction: column; align-items: stretch; gap: 2px; border-radius: 14px; padding: 8px 12px 10px; }
+    .settings .field input { height: 40px; font-size: 16px; }
+    .settings-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .settings-row .primary { grid-column: 1 / -1; height: 46px; }
+    .settings-row .ghost { height: 44px; }
+
+    /* player profile sheet */
+    .player-head { align-items: flex-start; gap: 12px; }
+    .player-avatar { width: 52px; height: 52px; font-size: .95rem; }
+    .player-name { font-size: 1.05rem; }
+    .player-meta { overflow-wrap: anywhere; }
+    .player-section { gap: 6px; }
+    .match { padding: 10px; }
+    .match-top { gap: 6px; font-size: .72rem; }
+    .match-body { flex-wrap: wrap; gap: 4px 10px; }
+    .match-players { flex: 1 1 100%; }
+    .match-players div { white-space: normal; overflow-wrap: anywhere; }
+    .match-score { font-size: .8rem; }
+    .match-rating { margin-left: auto; display: flex; align-items: baseline; gap: 6px; }
+    .match-rating b { display: inline; font-size: .82rem; }
+    #playerMore { width: 100%; height: 44px; }
+  }
+
+  /* touch screens: no lingering hover states, visible press feedback */
+  @media (hover: none) {
+    .row:hover { background: transparent; }
+    .row.selected:hover { background: var(--accent-soft); }
+    .ghost:hover:not(:disabled), .icon-btn:hover { background: var(--surface); }
+    .primary:hover:not(:disabled) { background: var(--navy); }
+    .row:active { background: var(--navy-05); }
+    .ghost:active, .icon-btn:active { background: var(--navy-05); }
+    .primary:active { background: #0a1f7a; }
+  }
+
+  @media (max-width: 380px) {
+    body { padding-left: max(10px, env(safe-area-inset-left)); padding-right: max(10px, env(safe-area-inset-right)); }
+    .card { padding: 12px; }
+    .segmented button { font-size: .78rem; padding: 8px 6px; }
+    .avatar { width: 36px; height: 36px; font-size: .74rem; }
+    .ratings { padding-left: 48px; }
+    .who-name { font-size: .88rem; }
+    .search-row svg { left: 14px; }
+    .search-input { padding-left: 40px; font-size: 16px; }
+    .player-avatar { width: 46px; height: 46px; }
+    .match-score { font-size: .76rem; }
+    .modal-head { padding: 10px 14px; }
+    .modal-body { padding-left: 14px; padding-right: 14px; }
   }
 </style>
 </head>
@@ -269,7 +386,7 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
           <circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.6-3.6"></path>
         </svg>
-        <input class="search-input" id="singleInput" type="search" placeholder="Search a player by full name…" autocomplete="off" spellcheck="false" />
+        <input class="search-input" id="singleInput" type="search" placeholder="Search a player by full name…" aria-label="Player name" enterkeyhint="search" autocapitalize="words" autocomplete="off" spellcheck="false" />
         <button class="primary search-go" id="singleGo" type="button">Search</button>
       </div>
       <p class="hint">Enter searches DUPR and lists every same-name profile — narrow it with the location filter.
@@ -279,8 +396,8 @@
     <div id="multiPane" hidden>
       <textarea id="names" spellcheck="false" aria-label="Names to look up, one per line"
                 placeholder="John Doe&#10;Jane Doe"></textarea>
-      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
-        <button class="primary" id="multiGo" type="button" style="height:42px">Look up all</button>
+      <div class="multi-actions">
+        <button class="primary" id="multiGo" type="button">Look up all</button>
         <button class="ghost" id="clearBtn" type="button">Clear</button>
       </div>
       <p class="hint">One name per line. Ctrl/&#8984; + Enter runs the lookup.</p>
@@ -342,7 +459,7 @@
       <code>?key=…</code> (or <code>?token=…</code>); it is saved locally and then removed from the
       address bar.</p>
     <div class="settings-row">
-      <button class="primary" id="settingsSave" type="button" style="height:34px">Save</button>
+      <button class="primary" id="settingsSave" type="button">Save</button>
       <button class="ghost" id="settingsClear" type="button">Clear both</button>
       <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
     </div>
