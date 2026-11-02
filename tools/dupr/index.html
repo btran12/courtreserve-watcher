@@ -182,6 +182,7 @@
   .nav-menu-text small { font-size: .72rem; color: var(--muted); }
   .nav-menu-check { margin-left: auto; flex: 0 0 auto; display: grid; place-items: center; color: var(--accent); }
   .hint { margin: 10px 0 0; font-size: .78rem; color: var(--muted); }
+  .hint:empty { display: none; }
   .hint code, .hint strong { color: var(--navy); }
   .hint code { background: var(--navy-05); border-radius: 5px; padding: 1px 5px; font-size: .76rem; }
   .hint code, details.help code { overflow-wrap: anywhere; }
@@ -318,7 +319,7 @@
     header { gap: 10px 8px; }
     .brand { flex: 1 1 100%; }
     header > .spacer { display: none; }
-    #cookiePill { flex: 1 1 auto; justify-content: center; min-height: 40px; }
+    #cookiePill { flex: 1 1 auto; justify-content: center; min-height: 40px; cursor: pointer; }
     #settingsBtn { flex: 0 0 auto; min-height: 40px; padding: 0 16px; }
 
     /* page menu moves to the bottom bar on phones */
@@ -450,6 +451,7 @@
     .settings-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .settings-row .primary { grid-column: 1 / -1; height: 46px; }
     .settings-row .ghost { height: 44px; }
+    .settings-row .ghost:last-child { grid-column: 1 / -1; }
 
     /* player profile sheet */
     .player-head { align-items: flex-start; gap: 12px; }
@@ -625,7 +627,12 @@
         <label for="tokenField">API key</label>
         <input id="tokenField" type="text" placeholder="x-dupr-token (required)" autocomplete="off" spellcheck="false" />
       </span>
+      <span class="field">
+        <label for="apiField">API endpoint</label>
+        <input id="apiField" type="url" placeholder="https://….execute-api.us-east-1.amazonaws.com" autocomplete="off" spellcheck="false" inputmode="url" />
+      </span>
     </div>
+    <p class="hint" id="apiHint"></p>
     <p class="hint">Kept in this browser only (<code>localStorage</code>). Your cookie is sent as
       <code>x-dupr-cookie</code> and used just for your requests — leave it empty to fall back to the cookie
       the server is configured with. The API key can also be supplied once in the URL:
@@ -633,7 +640,8 @@
       address bar.</p>
     <div class="settings-row">
       <button class="primary" id="settingsSave" type="button">Save</button>
-      <button class="ghost" id="settingsClear" type="button">Clear both</button>
+      <button class="ghost" id="settingsClear" type="button">Clear saved</button>
+      <button class="ghost" id="settingsResetApi" type="button">Default endpoint</button>
       <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
     </div>
     <details class="help">
@@ -700,8 +708,8 @@ const el = {
   singlePane: $('singlePane'), multiPane: $('multiPane'), singleInput: $('singleInput'), singleGo: $('singleGo'),
   names: $('names'), multiGo: $('multiGo'), clearBtn: $('clearBtn'), locInput: $('locInput'),
   sortRating: $('sortRating'), banner: $('banner'),
-  cookieField: $('cookieField'), tokenField: $('tokenField'),
-  settingsSave: $('settingsSave'), settingsClear: $('settingsClear'), settingsClose: $('settingsClose'),
+  cookieField: $('cookieField'), tokenField: $('tokenField'), apiField: $('apiField'), apiHint: $('apiHint'),
+  settingsSave: $('settingsSave'), settingsClear: $('settingsClear'), settingsClose: $('settingsClose'), settingsResetApi: $('settingsResetApi'),
   resultsPane: $('resultsPane'), results: $('results'), resultsTitle: $('resultsTitle'), resultsMeta: $('resultsMeta'),
 };
 
@@ -735,27 +743,100 @@ const DEFAULT_API_BASE = 'https://5me448fxzl.execute-api.us-east-1.amazonaws.com
 const apiBase = () => (window.DUPR_API_BASE || localStorage.getItem('dupr_api_base') || DEFAULT_API_BASE).replace(/\/+$/, '');
 // Optional per-visitor DUPR cookie; empty means "use the cookie the server is configured with".
 const myCookie = () => localStorage.getItem('dupr_cookie') || '';
-const apiFetch = (url, opts = {}) => {
-  const headers = { ...(opts.headers || {}) };
+// ── transport ────────────────────────────────────────────────────────────────
+// The gateway occasionally answers 502/503/504 (cold start, throttling, a deploy in flight) and
+// mobile networks drop connections, so a single retry hides most blips. The timeout stops a hung
+// socket from leaving the status pill stuck on "checking…" forever.
+const API_TIMEOUT_MS = 25000;
+const STATUS_TIMEOUT_MS = 8000;
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function requestGuard(ms, outer) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(new DOMException('Request timed out', 'TimeoutError')), ms);
+  const signal = outer && typeof AbortSignal.any === 'function' ? AbortSignal.any([outer, ctrl.signal]) : ctrl.signal;
+  return { signal, done: () => clearTimeout(timer) };
+}
+
+async function apiFetch(url, opts = {}) {
+  const { timeout = API_TIMEOUT_MS, retries = 1, signal: outer, ...rest } = opts;
+  const headers = { ...(rest.headers || {}) };
   const t = apiToken();
   if (t) headers['x-dupr-token'] = t;
   const c = myCookie();
   if (c) headers['x-dupr-cookie'] = c;
-  return fetch(apiBase() + url, { ...opts, headers });
+  const method = (rest.method || 'GET').toUpperCase();
+  const attempts = method === 'GET' || method === 'HEAD' ? Math.max(1, retries + 1) : 1;
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt) await sleep(300 * attempt + Math.random() * 250);
+    const guard = requestGuard(timeout, outer);
+    try {
+      const res = await fetch(apiBase() + url, { cache: 'no-store', ...rest, headers, signal: guard.signal });
+      if (attempt + 1 < attempts && RETRYABLE_STATUS.has(res.status)) {
+        try { await res.text(); } catch { /* drain before retrying */ }
+        lastError = Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
+        continue;
+      }
+      return res;
+    } catch (e) {
+      lastError = e;
+      // A timeout already consumed the whole budget; retrying only doubles the wait.
+      if (e?.name === 'TimeoutError' || e?.name === 'AbortError') break;
+    } finally {
+      guard.done();
+    }
+  }
+  throw lastError;
+}
+
+// Read the body as text first: API Gateway error pages are HTML/plain text, and res.json() on them
+// throws a SyntaxError that used to be reported as "proxy offline".
+async function readBody(res) {
+  const text = await res.text().catch(() => '');
+  try { return { json: JSON.parse(text), text }; }
+  catch { return { json: null, text }; }
+}
+
+async function fetchJson(url, opts) {
+  const res = await apiFetch(url, opts);
+  const { json, text } = await readBody(res);
+  return { res, json, text };
+}
+
+const apiErrorText = (e) => {
+  if (e?.name === 'TimeoutError' || e?.name === 'AbortError') return 'The API did not answer in time — check your connection and try again.';
+  if (e?.message === 'bad-token') return 'This endpoint requires an API key — open “Settings” and paste the x-dupr-token value from the stack output.';
+  return e?.message || 'Request failed.';
 };
-const apiErrorText = (e) => (e.message === 'bad-token'
-  ? 'This endpoint requires an API key — open “Settings” and paste the x-dupr-token value from the stack output.'
-  : e.message);
-const apiJson = async (url) => {
-  const res = await apiFetch(url);
-  let j = {};
-  try { j = await res.json(); } catch { /* non-JSON error page */ }
-  if (!res.ok || j.error) {
-    const err = new Error(j.message || j.error || `HTTP ${res.status}`);
-    err.payload = j;
+
+// Turn a thrown fetch/HTTP failure into a label that says what actually happened.
+function describeFailure(e) {
+  if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
+    return { text: 'proxy timeout', detail: 'The endpoint did not answer before the request timed out.' };
+  }
+  if (e?.status) return { text: `proxy error ${e.status}`, detail: `The endpoint answered HTTP ${e.status}.` };
+  const msg = e?.message || 'The request could not reach the endpoint.';
+  return { text: 'proxy offline', detail: /[.!?]$/.test(msg) ? msg : msg + '.' };
+}
+
+// A one-time ?api= override lives forever in localStorage; say so when it might be the culprit.
+const endpointNote = () => (!window.DUPR_API_BASE && localStorage.getItem('dupr_api_base'))
+  ? 'A saved endpoint override is active — check Settings → API endpoint.'
+  : '';
+const withNote = (detail) => [detail, endpointNote()].filter(Boolean).join(' ');
+
+const apiJson = async (url, opts) => {
+  const { res, json, text } = await fetchJson(url, opts);
+  if (!res.ok || (json && json.error)) {
+    const body = json ? (json.message || json.error) : `HTTP ${res.status}${text ? ' — ' + text.replace(/\s+/g, ' ').slice(0, 90) : ''}`;
+    const err = new Error(body);
+    err.status = res.status;
+    err.payload = json;
     throw err;
   }
-  return j;
+  return json;
 };
 
 // ── location filter (client side: DUPR ignores its own locationText param) ───
@@ -1001,21 +1082,42 @@ async function loadMorePlayerMatches() {
 }
 
 // ── proxy status ─────────────────────────────────────────────────────────────
-function pill(kind, text) {
+function pill(kind, text, detail) {
   el.cookiePill.className = 'pill' + (kind ? ' ' + kind : '');
   el.cookiePill.textContent = text;
+  el.cookiePill.title = detail ? `${detail}\n${apiBase()}\n\nClick to re-check.` : `${text}\n${apiBase()}\n\nClick to re-check.`;
 }
 
-async function checkStatus() {
+let statusSeq = 0;
+let lastStatusAt = 0;
+
+async function checkStatus({ force = false } = {}) {
+  // visibilitychange/online can fire in bursts; don't stack requests.
+  if (!force && Date.now() - lastStatusAt < 2000) return;
+  const seq = ++statusSeq;
   try {
-    const res = await apiFetch('/api/status');
-    const j = await res.json();
-    if (res.status === 401) { pill('bad', 'needs api key'); return; }
+    // Short timeout + one retry: fast enough for a status probe, tolerant of a cold start.
+    const { res, json: j } = await fetchJson('/api/status', { timeout: STATUS_TIMEOUT_MS, retries: 1 });
+    if (seq !== statusSeq) return;
+    lastStatusAt = Date.now();
+    if (res.status === 401) {
+      pill('bad', 'needs api key', 'The endpoint rejected the API key. Open Settings and paste the current x-dupr-token.');
+      return;
+    }
+    if (!res.ok || !j) {
+      const detail = j ? (j.message || j.error) : `The endpoint answered HTTP ${res.status} without JSON.`;
+      pill('bad', `proxy error ${res.status}`, withNote(detail));
+      return;
+    }
     store.hasCookie = !!j.cookieSet || !!j.userCookie;
-    if (j.userCookie) pill('ok', 'my cookie');
-    else pill(store.hasCookie ? '' : 'bad', store.hasCookie ? 'server cookie' : 'no cookie');
-  } catch {
-    pill('bad', 'proxy offline');
+    if (j.userCookie) pill('ok', 'my cookie', 'Requests use the cookie saved in this browser.');
+    else if (store.hasCookie) pill('', 'server cookie', 'Requests use the cookie configured on the server.');
+    else pill('bad', 'no cookie', 'The server has no DUPR cookie yet — add yours in Settings.');
+  } catch (e) {
+    if (seq !== statusSeq) return;
+    lastStatusAt = Date.now();
+    const f = describeFailure(e);
+    pill('bad', f.text, withNote(f.detail));
   }
 }
 
@@ -1023,11 +1125,14 @@ async function verifyCookie() {
   el.verifyBtn.disabled = true;
   pill('', 'testing…');
   try {
-    const j = await (await apiFetch('/api/verify')).json();
+    const { res, json: j } = await fetchJson('/api/verify', { timeout: API_TIMEOUT_MS, retries: 1 });
+    if (res.status === 401) { pill('bad', 'needs api key', 'The endpoint rejected the API key. Open Settings and paste the current x-dupr-token.'); return; }
+    if (!res.ok || !j) { pill('bad', `proxy error ${res.status}`, withNote(j ? (j.message || j.error) : `The endpoint answered HTTP ${res.status} without JSON.`)); return; }
     const suffix = j.userCookie ? ' (yours)' : '';
     pill(j.ok ? 'ok' : 'bad', j.ok ? 'cookie works' + suffix : (j.reason === 'cookie-rejected' ? 'cookie rejected' + suffix : (j.reason || 'failed')));
-  } catch {
-    pill('bad', 'proxy offline');
+  } catch (e) {
+    const f = describeFailure(e);
+    pill('bad', f.text, withNote(f.detail));
   } finally {
     el.verifyBtn.disabled = false;
   }
@@ -1048,9 +1153,8 @@ async function runSingle() {
   el.singleGo.disabled = true;
   el.singleGo.innerHTML = '<span class="spin"></span>';
   try {
-    const res = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`);
-    const j = await res.json();
-    if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+    const { res, json: j, text } = await fetchJson(`/api/search?q=${encodeURIComponent(query)}`);
+    if (!res.ok || !j) throw new Error(j ? (j.message || j.error) : `HTTP ${res.status}${text ? ' — ' + text.replace(/\s+/g, ' ').slice(0, 90) : ''}`);
     store.entries = [j];
     store.picks = {};
     if (j.error === 'cookie-rejected') showAuthBanner(j); else el.banner.innerHTML = '';
@@ -1075,13 +1179,12 @@ async function runMulti() {
     for (let i = 0; i < names.length; i += BATCH) {
       const batch = names.slice(i, i + BATCH);
       el.multiGo.innerHTML = `<span class="spin"></span> ${Math.min(i + BATCH, names.length)}/${names.length}…`;
-      const res = await apiFetch('/api/bulk', {
+      const { res, json: j, text } = await fetchJson('/api/bulk', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ names: batch }),
       });
-      const j = await res.json();
-      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
+      if (!res.ok || !j) throw new Error(j ? (j.message || j.error) : `HTTP ${res.status}${text ? ' — ' + text.replace(/\s+/g, ' ').slice(0, 90) : ''}`);
       results.push(...(j.results || []));
       if (results.some((x) => x.error === 'cookie-rejected')) break;
     }
@@ -1118,6 +1221,27 @@ function setMode(mode) {
   if (mode === 'single') setTimeout(() => el.singleInput.focus(), 30);
 }
 
+// ── settings ─────────────────────────────────────────────────────────────────
+function syncSettingsFields() {
+  el.cookieField.value = myCookie();
+  el.tokenField.value = apiToken();
+  el.apiField.value = apiBase();
+  el.apiHint.innerHTML = window.DUPR_API_BASE
+    ? 'Endpoint pinned by <code>window.DUPR_API_BASE</code> at load time — changes here are ignored.'
+    : localStorage.getItem('dupr_api_base')
+      ? 'Using a saved endpoint override. “Default endpoint” switches back to the deployed stack.'
+      : '';
+}
+
+function readApiField() {
+  const raw = el.apiField.value.trim().replace(/\/+$/, '');
+  if (!raw) return { reset: true };
+  let url;
+  try { url = new URL(raw); } catch { return { error: 'Enter a full URL such as https://abc123.execute-api.us-east-1.amazonaws.com (or leave empty for the default).' }; }
+  if (!/^https?:$/.test(url.protocol)) return { error: 'The API endpoint must start with http:// or https://.' };
+  return { base: url.href.replace(/\/+$/, '') };
+}
+
 // ── events ───────────────────────────────────────────────────────────────────
 el.modeSingle.addEventListener('click', () => setMode('single'));
 el.modeMulti.addEventListener('click', () => setMode('multi'));
@@ -1129,28 +1253,49 @@ el.clearBtn.addEventListener('click', () => { el.names.value = ''; store.entries
 el.verifyBtn.addEventListener('click', verifyCookie);
 el.settingsBtn.addEventListener('click', () => {
   if (!el.settingsModal.open) el.settingsModal.showModal();
+  syncSettingsFields();
   el.cookieField.focus();
 });
 el.settingsModal.addEventListener('click', (e) => {
   if (e.target === el.settingsModal) el.settingsModal.close();
 });
+el.apiField.addEventListener('input', () => el.apiField.setCustomValidity(''));
 el.settingsSave.addEventListener('click', () => {
+  const api = readApiField();
+  if (api.error) { el.apiField.setCustomValidity(api.error); el.apiField.reportValidity(); return; }
+  el.apiField.setCustomValidity('');
   const cookie = el.cookieField.value.trim();
   const token = el.tokenField.value.trim();
   if (cookie) localStorage.setItem('dupr_cookie', cookie); else localStorage.removeItem('dupr_cookie');
   if (token) localStorage.setItem('dupr_token', token); else localStorage.removeItem('dupr_token');
+  // A one-time ?api= used to stick forever and could silently point at a dead stack.
+  if (!window.DUPR_API_BASE) {
+    if (api.reset || api.base === DEFAULT_API_BASE) localStorage.removeItem('dupr_api_base');
+    else localStorage.setItem('dupr_api_base', api.base);
+  }
+  syncSettingsFields();
   el.settingsModal.close();
   el.banner.innerHTML = '';
-  checkStatus();
+  lastStatusAt = 0;
+  checkStatus({ force: true });
 });
 el.settingsClear.addEventListener('click', () => {
   localStorage.removeItem('dupr_cookie');
   localStorage.removeItem('dupr_token');
-  el.cookieField.value = '';
-  el.tokenField.value = '';
+  if (!window.DUPR_API_BASE) localStorage.removeItem('dupr_api_base');
+  el.apiField.setCustomValidity('');
+  syncSettingsFields();
   el.cookieField.focus();
   el.banner.innerHTML = '';
-  checkStatus();
+  lastStatusAt = 0;
+  checkStatus({ force: true });
+});
+el.settingsResetApi.addEventListener('click', () => {
+  if (!window.DUPR_API_BASE) localStorage.removeItem('dupr_api_base');
+  el.apiField.setCustomValidity('');
+  syncSettingsFields();
+  lastStatusAt = 0;
+  checkStatus({ force: true });
 });
 el.settingsClose.addEventListener('click', () => el.settingsModal.close());
 el.playerClose.addEventListener('click', () => el.playerModal.close());
@@ -1183,7 +1328,10 @@ try {
   let changed = false;
   const fromApi = (q.get('api') || '').trim();
   if (fromApi) {
-    localStorage.setItem('dupr_api_base', fromApi.replace(/\/+$/, ''));
+    const base = fromApi.replace(/\/+$/, '');
+    // Don't persist a "default" override: it would keep looking like a custom endpoint forever.
+    if (base === DEFAULT_API_BASE) localStorage.removeItem('dupr_api_base');
+    else localStorage.setItem('dupr_api_base', base);
     q.delete('api');
     changed = true;
   }
@@ -1240,8 +1388,13 @@ try {
   });
 })();
 
-el.cookieField.value = myCookie();
-el.tokenField.value = apiToken();
+// Recover automatically after a network flap: `online` fires when connectivity returns, and
+// visibilitychange when the user comes back to the tab. The 2 s guard in checkStatus() dedupes.
+window.addEventListener('online', () => { lastStatusAt = 0; checkStatus({ force: true }); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkStatus(); });
+el.cookiePill.addEventListener('click', () => { lastStatusAt = 0; checkStatus({ force: true }); });
+
+syncSettingsFields();
 checkStatus();
 setMode(store.mode);
 </script>
