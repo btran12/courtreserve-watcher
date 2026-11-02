@@ -18,21 +18,19 @@
 
 <header>
   <div class="header-title-group">
-    <img src="icon.png" class="app-icon" alt="CourtReserve Watcher" width="36" height="36">
-    <div class="header-text">
-      <h1>CourtReserve Watcher</h1>
-      <span id="status" class="last-updated">Checking updates...</span>
-    </div>
-  </div>
-  <div class="header-actions">
     <div class="nav-menu" id="navMenu">
       <button class="header-btn nav-menu-btn" id="navMenuBtn" type="button"
               aria-expanded="false" aria-controls="navMenuPanel"
               title="Open menu" aria-label="Open menu">
         <span class="material-symbols-outlined">menu</span>
-        <span class="btn-label">Menu</span>
       </button>
-      <nav class="nav-menu-panel" id="navMenuPanel" aria-label="Pages" hidden>
+      <nav class="nav-menu-panel" id="navMenuPanel" aria-label="Pages" inert>
+        <div class="nav-drawer-head">
+          <span class="nav-drawer-title">Menu</span>
+          <button class="nav-drawer-close" id="navMenuClose" type="button" aria-label="Close menu">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
         <a class="nav-menu-item" href="index.html" aria-current="page">
           <span class="material-symbols-outlined nav-menu-icon">calendar_month</span>
           <span class="nav-menu-text"><b>CourtReserve Watcher</b><small>Court availability</small></span>
@@ -44,6 +42,13 @@
         </a>
       </nav>
     </div>
+    <img src="icon.png" class="app-icon" alt="CourtReserve Watcher" width="36" height="36">
+    <div class="header-text">
+      <h1>CourtReserve Watcher</h1>
+      <span id="status" class="last-updated">Checking updates...</span>
+    </div>
+  </div>
+  <div class="header-actions">
     <div class="user-name-wrap">
       <span id="userNameDisplay" class="user-welcome">
         <span class="material-symbols-outlined" style="font-size:18px;">person</span>
@@ -59,6 +64,8 @@
   </div>
 </header>
 
+<div class="nav-scrim" id="navScrim"></div>
+
 <main id="app">
   <div style="text-align:center; padding: 40px; color: var(--md-on-surface-variant);">
     Loading events data...
@@ -72,28 +79,38 @@
   const menu = document.getElementById('navMenu');
   const btn = document.getElementById('navMenuBtn');
   const panel = document.getElementById('navMenuPanel');
+  const closeBtn = document.getElementById('navMenuClose');
   if (!menu || !btn || !panel) return;
 
+  const isOpen = () => document.body.classList.contains('nav-open');
   const setOpen = (open) => {
-    panel.hidden = !open;
+    document.body.classList.toggle('nav-open', open);
     btn.setAttribute('aria-expanded', String(open));
+    panel.toggleAttribute('inert', !open);
+    if (open && closeBtn) closeBtn.focus({ preventScroll: true });
   };
 
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
-    setOpen(panel.hidden);
+    setOpen(!isOpen());
   });
+  if (closeBtn) closeBtn.addEventListener('click', () => { setOpen(false); btn.focus(); });
   document.addEventListener('click', (event) => {
-    if (!panel.hidden && !menu.contains(event.target)) setOpen(false);
+    if (isOpen() && !menu.contains(event.target)) setOpen(false);
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !panel.hidden) {
+    if (event.key === 'Escape' && isOpen()) {
       setOpen(false);
       btn.focus();
     }
   });
   panel.addEventListener('click', (event) => {
     if (event.target.closest('a')) setOpen(false);
+  });
+
+  // The drawer is desktop-only; reset the state when the layout switches to the bottom bar.
+  window.matchMedia('(max-width: 600px)').addEventListener('change', (event) => {
+    if (event.matches) setOpen(false);
   });
 })();
 </script>

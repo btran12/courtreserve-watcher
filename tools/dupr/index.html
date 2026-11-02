@@ -117,21 +117,61 @@
   .ghost:hover:not(:disabled) { background: var(--navy-05); }
   .ghost:disabled { opacity: .5; cursor: default; }
 
-  /* ── page menu ── */
+  /* ── page menu: left drawer ── */
   .nav-menu { position: relative; display: flex; flex: 0 0 auto; }
   .bottom-nav { display: none; }
   .nav-menu-btn { display: inline-flex; align-items: center; gap: 7px; }
-  .nav-menu-panel {
-    position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
-    width: 272px; padding: 6px;
-    background: var(--surface); border: 1px solid var(--line);
-    border-radius: 14px; box-shadow: var(--shadow-float);
-    display: flex; flex-direction: column; gap: 2px;
+
+  .nav-scrim {
+    position: fixed; inset: 0; z-index: 40;
+    background: rgba(5, 21, 94, .45);
+    opacity: 0; visibility: hidden;
+    transition: opacity .24s ease, visibility 0s linear .24s;
   }
-  .nav-menu-panel[hidden] { display: none; }
+  body.nav-open .nav-scrim {
+    opacity: 1; visibility: visible;
+    transition: opacity .24s ease, visibility 0s;
+  }
+  @media (min-width: 641px) {
+    body.nav-open { overflow: hidden; }
+  }
+
+  .nav-menu-panel {
+    position: fixed; top: 0; left: 0; bottom: 0; z-index: 41;
+    width: 288px; max-width: 85vw;
+    padding: 14px 12px;
+    background: var(--surface); border-right: 1px solid var(--line);
+    box-shadow: 4px 0 24px rgba(5, 21, 94, .14);
+    display: flex; flex-direction: column; gap: 4px;
+    overflow-y: auto;
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform .24s ease, visibility 0s linear .24s;
+  }
+  body.nav-open .nav-menu-panel {
+    transform: none; visibility: visible;
+    transition: transform .24s ease, visibility 0s;
+  }
+
+  .nav-drawer-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 2px 4px 10px 8px; margin-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .nav-drawer-title {
+    font-size: .74rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--navy-60);
+  }
+  .nav-drawer-close {
+    width: 34px; height: 34px; display: grid; place-items: center;
+    border: 0; border-radius: 50%; background: transparent;
+    color: var(--navy-60); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .nav-drawer-close:hover { background: var(--navy-05); }
+
   .nav-menu-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 10px; border-radius: 10px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 12px; border-radius: 10px;
     color: var(--navy); text-decoration: none; line-height: 1.25;
   }
   .nav-menu-item:hover { background: var(--navy-05); }
@@ -425,12 +465,6 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="brand">
-      <div class="brand-mark">F-D</div>
-      <h1>Free DUPR</h1>
-    </div>
-    <div class="spacer"></div>
-    <span class="pill" id="cookiePill">checking…</span>
     <div class="nav-menu" id="navMenu">
       <button class="ghost nav-menu-btn" id="navMenuBtn" type="button"
               aria-expanded="false" aria-controls="navMenuPanel"
@@ -440,7 +474,15 @@
         </svg>
         <span class="nav-menu-label">Menu</span>
       </button>
-      <nav class="nav-menu-panel" id="navMenuPanel" aria-label="Pages" hidden>
+      <nav class="nav-menu-panel" id="navMenuPanel" aria-label="Pages" inert>
+        <div class="nav-drawer-head">
+          <span class="nav-drawer-title">Menu</span>
+          <button class="nav-drawer-close" id="navMenuClose" type="button" aria-label="Close menu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+              <path d="m6 6 12 12M18 6 6 18"></path>
+            </svg>
+          </button>
+        </div>
         <a class="nav-menu-item" href="../../index.html">
           <span class="nav-menu-icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -466,6 +508,12 @@
         </a>
       </nav>
     </div>
+    <div class="brand">
+      <div class="brand-mark">F-D</div>
+      <h1>Free DUPR</h1>
+    </div>
+    <div class="spacer"></div>
+    <span class="pill" id="cookiePill">checking…</span>
     <button class="ghost" id="settingsBtn" type="button" title="Cookie, API key and help">Settings</button>
   </header>
 
@@ -522,6 +570,8 @@
     <div id="results"></div>
   </section>
 </div>
+
+<div class="nav-scrim" id="navScrim"></div>
 
 <dialog class="modal" id="settingsModal" aria-labelledby="settingsTitle">
   <div class="modal-head">
@@ -1114,33 +1164,43 @@ try {
   }
 } catch { /* ignore */ }
 
-// Header page menu: toggles the navigation panel and closes it on outside click / Escape.
+// Header page menu: left drawer, closed by outside click / Escape / its close button.
 (() => {
   const menu = $('navMenu');
   const btn = $('navMenuBtn');
   const panel = $('navMenuPanel');
+  const closeBtn = $('navMenuClose');
   if (!menu || !btn || !panel) return;
 
+  const isOpen = () => document.body.classList.contains('nav-open');
   const setOpen = (open) => {
-    panel.hidden = !open;
+    document.body.classList.toggle('nav-open', open);
     btn.setAttribute('aria-expanded', String(open));
+    panel.toggleAttribute('inert', !open);
+    if (open && closeBtn) closeBtn.focus({ preventScroll: true });
   };
 
   btn.addEventListener('click', (event) => {
     event.stopPropagation();
-    setOpen(panel.hidden);
+    setOpen(!isOpen());
   });
+  if (closeBtn) closeBtn.addEventListener('click', () => { setOpen(false); btn.focus(); });
   document.addEventListener('click', (event) => {
-    if (!panel.hidden && !menu.contains(event.target)) setOpen(false);
+    if (isOpen() && !menu.contains(event.target)) setOpen(false);
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && !panel.hidden) {
+    if (event.key === 'Escape' && isOpen()) {
       setOpen(false);
       btn.focus();
     }
   });
   panel.addEventListener('click', (event) => {
     if (event.target.closest('a')) setOpen(false);
+  });
+
+  // The drawer is desktop-only; reset the state when the layout switches to the bottom bar.
+  window.matchMedia('(max-width: 640px)').addEventListener('change', (event) => {
+    if (event.matches) setOpen(false);
   });
 })();
 
