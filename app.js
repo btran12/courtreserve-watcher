@@ -596,6 +596,11 @@ function addDays(date, days) {
   return d;
 }
 
+function fromDateStr(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 function getWeekDays(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay();
@@ -970,14 +975,18 @@ function renderDayView(d) {
     slotsByDate[s.date].push(s);
   }
 
-  // The ribbon is a long, horizontally scrollable strip anchored on today, so future dates are one
-  // flick away instead of requiring the arrows. It grows only if the selected day falls outside.
-  const todayMid = new Date();
-  const selectedMid = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-  const stripBaseFirst = getWeekDays(addDays(todayMid, -7))[0];
-  const stripBaseLast = getWeekDays(addDays(todayMid, 56))[6];
-  const stripFirst = selectedMid < stripBaseFirst ? getWeekDays(selectedMid)[0] : stripBaseFirst;
-  const stripLast = selectedMid > stripBaseLast ? getWeekDays(selectedMid)[6] : stripBaseLast;
+  // The ribbon covers exactly the dates the backend actually returned (slot snapshots and court
+  // availability), padded out to full Mon–Sun weeks. Today and the selected day are always kept in
+  // range so the strip still works if the URL points at a date with no data yet.
+  const dataDates = new Set();
+  for (const s of Object.values(d.snapshots || {})) if (s.date) dataDates.add(s.date);
+  for (const key of Object.keys((d.courts && d.courts.days) || {})) dataDates.add(key);
+  dataDates.add(todayStr);
+  dataDates.add(selectedDateStr);
+
+  const sortedDates = [...dataDates].sort();
+  const stripFirst = getWeekDays(fromDateStr(sortedDates[0]))[0];
+  const stripLast = getWeekDays(fromDateStr(sortedDates[sortedDates.length - 1]))[6];
 
   const ribbonDays = [];
   for (let day = stripFirst; day <= stripLast; day = addDays(day, 1)) ribbonDays.push(day);

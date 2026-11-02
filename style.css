@@ -884,14 +884,14 @@
     border: 1px solid transparent;
     background: transparent;
     border-radius: 10px;
-    padding: 8px 4px;
+    padding: 10px 6px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
     transition: all 0.15s;
-    min-width: 48px;
+    min-width: 84px;
   }
 
   /* Small break between weeks on the long day strip. */
@@ -1399,9 +1399,15 @@
     .day-slot-body .people-list li { padding: 3px 0; }
     .day-slot-body .empty-state { font-size: 0.85rem; }
 
-    /* Day ribbon compact */
+    /* Day ribbon compact: exactly 7 days fit across the screen, then scroll for more. */
     .day-ribbon { gap: 4px; padding: 6px; }
-    .day-ribbon-btn { padding: 6px 2px; min-width: 38px; }
+    .day-ribbon-btn {
+      /* 100% is the strip's content width inside its 6px padding, minus six 4px gaps. */
+      flex: 0 0 calc((100% - 24px) / 7);
+      min-width: 0;
+      padding: 6px 2px;
+    }
+    .day-ribbon-btn.week-gap { margin-left: 0; }
     .ribbon-day-name { font-size: 0.7rem; }
     .ribbon-day-val { font-size: 1.1rem; }
 

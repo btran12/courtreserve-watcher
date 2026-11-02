@@ -121,6 +121,7 @@ logged-in DUPR session: `npm run dupr` → <http://localhost:8787>. Setup and ca
 `https://d22bq7zsasshul.cloudfront.net/viewer.html`
 
 **Day view navigation:** the day strip above the day scrolls on its own (swipe on touch, scroll
-horizontally on a trackpad, or drag the scrollbar) across roughly nine weeks, so a future date is one
-flick away — tap any day to open it. The page content itself also moves one day at a time with a
+horizontally on a trackpad, or drag the scrollbar) and spans the dates present in `state.json`,
+padded out to full weeks — tap any day to open it. On phones exactly seven days fill the screen at
+once; on desktop the day cells are wider. The page content itself also moves one day at a time with a
 left/right swipe, a horizontal trackpad gesture, or the ← / → keys. Vertical scrolling is unaffected.
