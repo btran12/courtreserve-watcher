@@ -58,6 +58,41 @@ function toggleWatch(slotKey) {
   renderCurrentView();
 }
 
+// "Sat, Nov 8 (Tomorrow) · 7:00am" — enough context to place a change without opening the app.
+function slotWhenLabel(s) {
+  const time = s.time ? fmtTime(s.time) : '';
+  if (!s.date) return time;
+  const dateLabel = fromDateStr(s.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+  const rel = getRelativeDateLabel(s.date);
+  const relLabel = rel === 'Today' || rel === 'Tomorrow' ? ` (${rel})` : '';
+  return `${dateLabel}${relLabel} · ${time}`;
+}
+
+// Compares the roster kept from the previous poll (name → 'reg' | 'wait') against the current one
+// so every toast can name who actually joined, left, or moved between the list and the waitlist.
+function rosterChanges(prevRoster, roster) {
+  const changes = [];
+  const names = new Set([...Object.keys(prevRoster || {}), ...Object.keys(roster || {})]);
+  for (const name of [...names].sort((a, b) => a.localeCompare(b))) {
+    const before = (prevRoster || {})[name];
+    const after = (roster || {})[name];
+    if (!before && after) changes.push({ type: after === 'reg' ? 'joined' : 'waitlist-joined', name });
+    else if (before && !after) changes.push({ type: before === 'reg' ? 'left' : 'waitlist-left', name });
+    else if (before === 'wait' && after === 'reg') changes.push({ type: 'promoted', name });
+    else if (before === 'reg' && after === 'wait') changes.push({ type: 'demoted', name });
+  }
+  return changes;
+}
+
+// "12 registered (+2) · 1 waitlisted (-1) · 0 open" — the numeric side of a change.
+function rosterSummaryLine(regCount, prevReg, waitCount, prevWait, spots) {
+  const delta = (n, p) => (p == null || n === p) ? '' : ` (${n > p ? '+' : ''}${n - p})`;
+  const parts = [`${regCount} registered${delta(regCount, prevReg)}`];
+  if (waitCount > 0 || (prevWait || 0) > 0) parts.push(`${waitCount} waitlisted${delta(waitCount, prevWait)}`);
+  if (spots != null) parts.push(spots > 0 ? `${spots} open` : 'full');
+  return parts.join(' · ');
+}
+
 function checkWatchedChanges(data) {
   if (!data || !data.snapshots) return;
   const newSnap = {};
@@ -72,25 +107,30 @@ function checkWatchedChanges(data) {
     const spots = evData.spotsRemaining != null ? evData.spotsRemaining
       : evData.capacity != null ? Math.max(0, evData.capacity - regCount) : null;
 
-    newSnap[key] = { regCount, waitCount, spots };
+    // Keep the full roster (name → status) so the next poll can report exactly who moved.
+    const roster = {};
+    for (const [name, p] of Object.entries(s.people)) roster[name] = p && p.status ? p.status : p;
+
+    newSnap[key] = { regCount, waitCount, spots, roster };
 
     const prev = lastWatchSnapshot[key];
     if (!prev) continue; // first time seeing this event, no toast
 
+    // Snapshots stored before rosters were tracked have no roster to diff against yet.
+    const changes = prev.roster ? rosterChanges(prev.roster, roster) : [];
+    const countsChanged = regCount !== prev.regCount || waitCount !== prev.waitCount;
+
+    const when = slotWhenLabel(s);
+    const eventName = (s.events || []).map((e) => e.name).join(' / ') || key;
+    const summary = rosterSummaryLine(regCount, prev.regCount, waitCount, prev.waitCount, spots);
+
     // Spot-opened toast
     if (spots != null && prev.spots != null && prev.spots === 0 && spots > 0) {
-      const time = fmtTime(s.time);
-      const evName = (s.events && s.events[0]) ? s.events[0].name : key;
-      toasts.push({ type: 'spot-open', title: `${spots} spot${spots > 1 ? 's' : ''} opened!`, detail: `${evName} — ${time}`, key });
+      toasts.push({ type: 'spot-open', title: `${spots} spot${spots > 1 ? 's' : ''} opened!`, when, eventName, summary, changes, key });
     }
-    // General change toast (roster changed)
-    else if (regCount !== prev.regCount || waitCount !== prev.waitCount) {
-      const time = fmtTime(s.time);
-      const evName = (s.events && s.events[0]) ? s.events[0].name : key;
-      const diffs = [];
-      if (regCount !== prev.regCount) diffs.push(`${regCount} registered (was ${prev.regCount})`);
-      if (waitCount !== prev.waitCount) diffs.push(`${waitCount} waitlisted (was ${prev.waitCount})`);
-      toasts.push({ type: 'change', title: 'Roster changed', detail: `${evName} — ${time} · ${diffs.join(', ')}`, key });
+    // General change toast (roster changed, including swaps that keep the counts identical)
+    else if (changes.length || countsChanged) {
+      toasts.push({ type: 'change', title: 'Roster changed', when, eventName, summary, changes, key });
     }
   }
 
@@ -140,6 +180,20 @@ function syncToastContainer() {
   if (bulk) bulk.classList.toggle('visible', n > 1);
 }
 
+// Named roster movements inside a toast, e.g. "Alex Chen joined". Capped so a mass
+// change can't turn one toast into an unbounded wall of text.
+const MAX_TOAST_CHANGES = 4;
+
+function toastChangesHtml(changes) {
+  if (!changes || !changes.length) return '';
+  const shown = changes.slice(0, MAX_TOAST_CHANGES);
+  const extra = changes.length - shown.length;
+  const items = shown.map((c) =>
+    `<li class="tc-${cls(c.type)}"><span class="material-symbols-outlined">${ICON[c.type] || 'info'}</span><span><b>${esc(c.name)}</b> ${esc(TEXT[c.type] || c.type)}</span></li>`
+  ).join('');
+  return `<ul class="toast-changes">${items}${extra ? `<li class="toast-more">+${extra} more change${extra > 1 ? 's' : ''}</li>` : ''}</ul>`;
+}
+
 function showToast(t) {
   // The container is torn down once the last toast is dismissed, so recreate on demand.
   ensureToastContainer();
@@ -158,7 +212,13 @@ function showToast(t) {
   const el = document.createElement('div');
   el.className = `toast ${t.type}`;
   el.innerHTML = `<span class="toast-icon material-symbols-outlined" style="color:${t.type === 'spot-open' ? '#2e7d32' : '#1976d2'}">${t.type === 'spot-open' ? 'event_available' : 'campaign'}</span>
-    <div class="toast-body"><div class="toast-title">${t.title}</div><div class="toast-detail">${t.detail}</div></div>
+    <div class="toast-body">
+      <div class="toast-title">${esc(t.title)}</div>
+      ${t.when ? `<div class="toast-when"><span class="material-symbols-outlined">schedule</span><span>${esc(t.when)}</span></div>` : ''}
+      ${t.eventName ? `<div class="toast-event">${esc(t.eventName)}</div>` : ''}
+      ${t.summary ? `<div class="toast-detail">${esc(t.summary)}</div>` : ''}
+      ${toastChangesHtml(t.changes)}
+    </div>
     <button type="button" class="toast-close" aria-label="Dismiss notification" title="Dismiss">
       <span class="material-symbols-outlined">close</span>
     </button>`;

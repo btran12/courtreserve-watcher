@@ -1690,7 +1690,39 @@
   .toast .toast-icon { flex-shrink: 0; margin-top: 1px; }
   .toast .toast-body { flex: 1; min-width: 0; }
   .toast .toast-title { font-weight: 700; margin-bottom: 2px; }
-  .toast .toast-detail { color: var(--md-on-surface-variant); font-size: 0.8rem; }
+  .toast .toast-when {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--md-primary);
+  }
+  .toast .toast-when .material-symbols-outlined { font-size: 14px; }
+  .toast .toast-event {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    overflow-wrap: anywhere;
+  }
+  .toast .toast-detail { color: var(--md-on-surface-variant); font-size: 0.8rem; margin-top: 2px; }
+  /* Named roster movements (who joined / left / moved lists) */
+  .toast .toast-changes {
+    list-style: none;
+    margin: 6px 0 0 0;
+    padding: 6px 0 0 0;
+    border-top: 1px solid var(--md-outline);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.78rem;
+  }
+  .toast .toast-changes li { display: flex; align-items: flex-start; gap: 4px; overflow-wrap: anywhere; }
+  .toast .toast-changes .material-symbols-outlined { font-size: 14px; flex-shrink: 0; }
+  .toast .toast-changes .tc-j .material-symbols-outlined { color: #2e7d32; }
+  .toast .toast-changes .tc-w .material-symbols-outlined { color: #ed6c02; }
+  .toast .toast-changes .tc-l .material-symbols-outlined { color: #c62828; }
+  .toast .toast-changes .toast-more { color: var(--md-on-surface-variant); font-style: italic; }
   .toast.spot-open { border-left: 4px solid #2e7d32; }
   .toast.change { border-left: 4px solid #1976d2; }
 
@@ -2214,6 +2246,10 @@
     /* Keep toasts above the floating bar */
     .toast-container {
       bottom: calc(96px + env(safe-area-inset-bottom));
+      left: 12px;
       right: 12px;
+      max-width: none;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
     }
   }
