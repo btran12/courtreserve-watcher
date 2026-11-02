@@ -95,10 +95,9 @@ CORS is configured on the API (headers `content-type, x-dupr-token, x-dupr-cooki
 3. Create, then copy the **Outputs → `ApiBaseUrl`** value, e.g.
    `https://abc123.execute-api.us-east-1.amazonaws.com`.
 4. Host `tools/dupr/index.html` anywhere static (GitHub Pages, S3 + CloudFront, Netlify…). The page
-   already defaults to `https://5me448fxzl.execute-api.us-east-1.amazonaws.com`, so no endpoint
-   setup is needed. To point it at a different stack, open it once as
-   `https://your.site/?api=https://abc123.execute-api.us-east-1.amazonaws.com` (the value is saved
-   in `localStorage` and the query string is then removed).
+   always calls the endpoint baked into it (`https://5me448fxzl.execute-api.us-east-1.amazonaws.com`),
+   so visitors never configure anything. To target a different stack, change `API_BASE` at the top of
+   the page's script and redeploy the page.
 5. If you set `ApiToken`, supply it once via **Settings** → **API key**, or in the URL:
    `https://your.site/?key=YOUR_TOKEN` (also accepted as `?token=…`). It is saved in `localStorage`
    and then removed from the address bar.
@@ -128,9 +127,9 @@ Use `aws/dupr-template.yaml`:
 
 4. Acknowledge the IAM capability (`AWS::IAM::Role`) and create. The **Outputs** tab gives you
    `FunctionUrl`, `SearchEndpoint`, `BulkEndpoint`, `StatusEndpoint` and whether a token is required.
-5. Host `tools/dupr/index.html` separately (as in Option A, step 4), then open it once with
-   `?api=<FunctionUrl>` so it talks to this stack. If you set `ApiToken`, also add
-   `&key=YOUR_TOKEN` or paste it via **Settings**; it's kept in `localStorage`.
+5. Host `tools/dupr/index.html` separately (as in Option A, step 4) and set `API_BASE` to the
+   `FunctionUrl` output. If you set `ApiToken`, supply it once via **Settings** → **API key** or in
+   the URL: `?key=YOUR_TOKEN`; it is kept in `localStorage` and then removed from the address bar.
 
 If a Function URL answers `403 Forbidden` / `AccessDeniedException`, the function is missing the
 `lambda:InvokeFunctionUrl` statement (Permissions tab → *Add permissions* → **Function URL**, auth

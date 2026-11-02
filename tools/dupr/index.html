@@ -628,12 +628,7 @@
         <label for="tokenField">API key</label>
         <input id="tokenField" type="text" placeholder="x-dupr-token (required)" autocomplete="off" spellcheck="false" />
       </span>
-      <span class="field">
-        <label for="apiField">API endpoint</label>
-        <input id="apiField" type="url" placeholder="https://….execute-api.us-east-1.amazonaws.com" autocomplete="off" spellcheck="false" inputmode="url" />
-      </span>
     </div>
-    <p class="hint" id="apiHint"></p>
     <p class="hint">Kept in this browser only (<code>localStorage</code>). Your cookie is sent as
       <code>x-dupr-cookie</code> and used just for your requests — leave it empty to fall back to the cookie
       the server is configured with. The API key can also be supplied once in the URL:
@@ -642,7 +637,6 @@
     <div class="settings-row">
       <button class="primary" id="settingsSave" type="button">Save</button>
       <button class="ghost" id="settingsClear" type="button">Clear saved</button>
-      <button class="ghost" id="settingsResetApi" type="button">Default endpoint</button>
       <button class="ghost" id="verifyBtn" type="button">Test cookie</button>
     </div>
     <details class="help">
@@ -709,8 +703,8 @@ const el = {
   singlePane: $('singlePane'), multiPane: $('multiPane'), singleInput: $('singleInput'), singleGo: $('singleGo'),
   names: $('names'), multiGo: $('multiGo'), clearBtn: $('clearBtn'), locInput: $('locInput'),
   sortRating: $('sortRating'), banner: $('banner'),
-  cookieField: $('cookieField'), tokenField: $('tokenField'), apiField: $('apiField'), apiHint: $('apiHint'),
-  settingsSave: $('settingsSave'), settingsClear: $('settingsClear'), settingsClose: $('settingsClose'), settingsResetApi: $('settingsResetApi'),
+  cookieField: $('cookieField'), tokenField: $('tokenField'),
+  settingsSave: $('settingsSave'), settingsClear: $('settingsClear'), settingsClose: $('settingsClose'),
   resultsPane: $('resultsPane'), results: $('results'), resultsTitle: $('resultsTitle'), resultsMeta: $('resultsMeta'),
 };
 
@@ -748,6 +742,7 @@ function openPendingPlayer() {
 
 // no default names: the field starts empty and only remembers what you type locally
 localStorage.removeItem('dupr_names'); // drop the roster cached by earlier builds
+localStorage.removeItem('dupr_api_base'); // the endpoint is built in now; drop old overrides
 el.names.value = localStorage.getItem('dupr_names_typed') || '';
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -755,10 +750,9 @@ const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2
 
 // When the Lambda is deployed with an ApiToken, every /api/* call must carry it.
 const apiToken = () => localStorage.getItem('dupr_token') || '';
-// Where the API lives. Defaults to the deployed endpoint; override once with ?api=https://…
-// (or window.DUPR_API_BASE) when hosting against a different stack.
-const DEFAULT_API_BASE = 'https://5me448fxzl.execute-api.us-east-1.amazonaws.com';
-const apiBase = () => (window.DUPR_API_BASE || localStorage.getItem('dupr_api_base') || DEFAULT_API_BASE).replace(/\/+$/, '');
+// The only API endpoint this page talks to. Edit it here (and redeploy the page) to
+// host the page against a different stack — visitors never set it themselves.
+const API_BASE = 'https://5me448fxzl.execute-api.us-east-1.amazonaws.com';
 // Optional per-visitor DUPR cookie; empty means "use the cookie the server is configured with".
 const myCookie = () => localStorage.getItem('dupr_cookie') || '';
 
@@ -865,7 +859,7 @@ async function apiFetch(url, opts = {}) {
     if (attempt) await sleep(300 * attempt + Math.random() * 250);
     const guard = requestGuard(timeout, outer);
     try {
-      const res = await fetch(apiBase() + url, { cache: 'no-store', ...rest, headers, signal: guard.signal });
+      const res = await fetch(API_BASE + url, { cache: 'no-store', ...rest, headers, signal: guard.signal });
       if (attempt + 1 < attempts && RETRYABLE_STATUS.has(res.status)) {
         try { await res.text(); } catch { /* drain before retrying */ }
         lastError = Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
@@ -912,12 +906,6 @@ function describeFailure(e) {
   const msg = e?.message || 'The request could not reach the endpoint.';
   return { text: 'proxy offline', detail: /[.!?]$/.test(msg) ? msg : msg + '.' };
 }
-
-// A one-time ?api= override lives forever in localStorage; say so when it might be the culprit.
-const endpointNote = () => (!window.DUPR_API_BASE && localStorage.getItem('dupr_api_base'))
-  ? 'A saved endpoint override is active — check Settings → API endpoint.'
-  : '';
-const withNote = (detail) => [detail, endpointNote()].filter(Boolean).join(' ');
 
 const apiJson = async (url, opts) => {
   const { res, json, text } = await fetchJson(url, opts);
@@ -1178,7 +1166,7 @@ async function loadMorePlayerMatches() {
 function pill(kind, text, detail) {
   el.cookiePill.className = 'pill' + (kind ? ' ' + kind : '');
   el.cookiePill.textContent = text;
-  el.cookiePill.title = detail ? `${detail}\n${apiBase()}\n\nClick to re-check.` : `${text}\n${apiBase()}\n\nClick to re-check.`;
+  el.cookiePill.title = detail ? `${detail}\n${API_BASE}\n\nClick to re-check.` : `${text}\n${API_BASE}\n\nClick to re-check.`;
 }
 
 let statusSeq = 0;
@@ -1199,7 +1187,7 @@ async function checkStatus({ force = false } = {}) {
     }
     if (!res.ok || !j) {
       const detail = j ? (j.message || j.error) : `The endpoint answered HTTP ${res.status} without JSON.`;
-      pill('bad', `proxy error ${res.status}`, withNote(detail));
+      pill('bad', `proxy error ${res.status}`, detail);
       return;
     }
     store.hasCookie = !!j.cookieSet || !!j.userCookie;
@@ -1210,7 +1198,7 @@ async function checkStatus({ force = false } = {}) {
     if (seq !== statusSeq) return;
     lastStatusAt = Date.now();
     const f = describeFailure(e);
-    pill('bad', f.text, withNote(f.detail));
+    pill('bad', f.text, f.detail);
   }
 }
 
@@ -1220,12 +1208,12 @@ async function verifyCookie() {
   try {
     const { res, json: j } = await fetchJson('/api/verify', { timeout: API_TIMEOUT_MS, retries: 1 });
     if (res.status === 401) { pill('bad', 'needs api key', 'The endpoint rejected the API key. Open Settings and paste the current x-dupr-token.'); return; }
-    if (!res.ok || !j) { pill('bad', `proxy error ${res.status}`, withNote(j ? (j.message || j.error) : `The endpoint answered HTTP ${res.status} without JSON.`)); return; }
+    if (!res.ok || !j) { pill('bad', `proxy error ${res.status}`, (j ? (j.message || j.error) : `The endpoint answered HTTP ${res.status} without JSON.`)); return; }
     const suffix = j.userCookie ? ' (yours)' : '';
     pill(j.ok ? 'ok' : 'bad', j.ok ? 'cookie works' + suffix : (j.reason === 'cookie-rejected' ? 'cookie rejected' + suffix : (j.reason || 'failed')));
   } catch (e) {
     const f = describeFailure(e);
-    pill('bad', f.text, withNote(f.detail));
+    pill('bad', f.text, f.detail);
   } finally {
     el.verifyBtn.disabled = false;
   }
@@ -1325,21 +1313,6 @@ function setMode(mode) {
 function syncSettingsFields() {
   el.cookieField.value = myCookie();
   el.tokenField.value = apiToken();
-  el.apiField.value = apiBase();
-  el.apiHint.innerHTML = window.DUPR_API_BASE
-    ? 'Endpoint pinned by <code>window.DUPR_API_BASE</code> at load time — changes here are ignored.'
-    : localStorage.getItem('dupr_api_base')
-      ? 'Using a saved endpoint override. “Default endpoint” switches back to the deployed stack.'
-      : '';
-}
-
-function readApiField() {
-  const raw = el.apiField.value.trim().replace(/\/+$/, '');
-  if (!raw) return { reset: true };
-  let url;
-  try { url = new URL(raw); } catch { return { error: 'Enter a full URL such as https://abc123.execute-api.us-east-1.amazonaws.com (or leave empty for the default).' }; }
-  if (!/^https?:$/.test(url.protocol)) return { error: 'The API endpoint must start with http:// or https://.' };
-  return { base: url.href.replace(/\/+$/, '') };
 }
 
 // ── events ───────────────────────────────────────────────────────────────────
@@ -1365,20 +1338,11 @@ el.settingsBtn.addEventListener('click', () => {
 el.settingsModal.addEventListener('click', (e) => {
   if (e.target === el.settingsModal) el.settingsModal.close();
 });
-el.apiField.addEventListener('input', () => el.apiField.setCustomValidity(''));
 el.settingsSave.addEventListener('click', () => {
-  const api = readApiField();
-  if (api.error) { el.apiField.setCustomValidity(api.error); el.apiField.reportValidity(); return; }
-  el.apiField.setCustomValidity('');
   const cookie = el.cookieField.value.trim();
   const token = el.tokenField.value.trim();
   if (cookie) localStorage.setItem('dupr_cookie', cookie); else localStorage.removeItem('dupr_cookie');
   if (token) localStorage.setItem('dupr_token', token); else localStorage.removeItem('dupr_token');
-  // A one-time ?api= used to stick forever and could silently point at a dead stack.
-  if (!window.DUPR_API_BASE) {
-    if (api.reset || api.base === DEFAULT_API_BASE) localStorage.removeItem('dupr_api_base');
-    else localStorage.setItem('dupr_api_base', api.base);
-  }
   syncSettingsFields();
   el.settingsModal.close();
   el.banner.innerHTML = '';
@@ -1388,18 +1352,9 @@ el.settingsSave.addEventListener('click', () => {
 el.settingsClear.addEventListener('click', () => {
   localStorage.removeItem('dupr_cookie');
   localStorage.removeItem('dupr_token');
-  if (!window.DUPR_API_BASE) localStorage.removeItem('dupr_api_base');
-  el.apiField.setCustomValidity('');
   syncSettingsFields();
   el.cookieField.focus();
   el.banner.innerHTML = '';
-  lastStatusAt = 0;
-  checkStatus({ force: true });
-});
-el.settingsResetApi.addEventListener('click', () => {
-  if (!window.DUPR_API_BASE) localStorage.removeItem('dupr_api_base');
-  el.apiField.setCustomValidity('');
-  syncSettingsFields();
   lastStatusAt = 0;
   checkStatus({ force: true });
 });
@@ -1442,25 +1397,20 @@ el.results.addEventListener('click', (e) => {
 el.singleInput.value = localStorage.getItem('dupr_single') || '';
 
 // One-time URL params, then leave the address bar clean:
-//   ?api=https://…   override the API endpoint
 //   ?key=… / ?token=… supply the x-dupr-token API key
 try {
   const q = new URLSearchParams(location.search);
   let changed = false;
-  const fromApi = (q.get('api') || '').trim();
-  if (fromApi) {
-    const base = fromApi.replace(/\/+$/, '');
-    // Don't persist a "default" override: it would keep looking like a custom endpoint forever.
-    if (base === DEFAULT_API_BASE) localStorage.removeItem('dupr_api_base');
-    else localStorage.setItem('dupr_api_base', base);
-    q.delete('api');
-    changed = true;
-  }
   const fromKey = (q.get('key') || q.get('token') || '').trim();
   if (fromKey) {
     localStorage.setItem('dupr_token', fromKey);
     q.delete('key');
     q.delete('token');
+    changed = true;
+  }
+  // The endpoint is fixed now; strip an ?api= left over from an older bookmark.
+  if (q.has('api')) {
+    q.delete('api');
     changed = true;
   }
   if (changed) {
