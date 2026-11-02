@@ -433,6 +433,14 @@
     padding: 2px 0;
   }
 
+  /* Unfilled capacity: numbered but blank rows, e.g. "24. __________" */
+  ol.people-list li.open-slot,
+  .cal-roster-list li.open-slot {
+    color: #cfd8dc;
+    letter-spacing: 1px;
+    user-select: none;
+  }
+
   .empty-state {
     color: #9e9e9e;
     font-size: 0.85rem;

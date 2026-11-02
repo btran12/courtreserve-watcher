@@ -306,6 +306,15 @@ function highlightNameWaitlist(name) {
   return esc(name);
 }
 
+// Blank, pre-numbered rows for the spots still open, e.g. "24. __________".
+// The <ol> numbering continues from the registered names, so a null entry is just a placeholder.
+const OPEN_SLOT_LI = '<li class="open-slot" aria-label="Open spot">__________</li>';
+
+function withOpenSlots(names, openCount) {
+  const blanks = Math.max(0, Math.floor(Number(openCount) || 0));
+  return names.concat(Array(blanks).fill(null));
+}
+
 
 function spotsLabel(evt) {
   const parts = [];
@@ -332,17 +341,22 @@ function renderPerEventSections(s) {
   return s.events.map((evt) => {
     const regNames = (evt.reg || []).sort((a, b) => a.localeCompare(b));
     const waitNames = (evt.wait || []).sort((a, b) => a.localeCompare(b));
-    const half = Math.ceil(regNames.length / 2);
-    const col1 = regNames.slice(0, half);
-    const col2 = regNames.slice(half);
 
-    const makeList = (items, startIdx, hlFn) =>
+    // Fill the roster out to capacity so open spots show as numbered blanks.
+    const openSpots = evt.spotsRemaining != null ? evt.spotsRemaining
+      : evt.capacity != null ? Math.max(0, evt.capacity - regNames.length) : 0;
+    const entries = withOpenSlots(regNames, openSpots);
+    const half = Math.ceil(entries.length / 2);
+    const col1 = entries.slice(0, half);
+    const col2 = entries.slice(half);
+
+    const makeList = (items, startIdx) =>
       '<ol class="people-list" start="' + startIdx + '">' +
-      items.map((n) => '<li>' + hlFn(n) + '</li>').join('') +
+      items.map((n) => n == null ? OPEN_SLOT_LI : '<li>' + highlightName(n) + '</li>').join('') +
       '</ol>';
 
-    const regHtml = regNames.length
-      ? '<div class="roster-2col"><div>' + makeList(col1, 1, highlightName) + '</div><div>' + (col2.length ? makeList(col2, half + 1, highlightName) : '') + '</div></div>'
+    const regHtml = entries.length
+      ? '<div class="roster-2col"><div>' + makeList(col1, 1) + '</div><div>' + (col2.length ? makeList(col2, half + 1) : '') + '</div></div>'
       : '<div class="empty-state">No registered participants yet</div>';
 
     const waitHtml = waitNames.length
@@ -949,6 +963,7 @@ function renderWeekView(d) {
         }
         const openSpots = weekRem != null ? weekRem
           : weekCap != null ? Math.max(0, weekCap - regNames.length) : null;
+        const regEntries = withOpenSlots(regNames, openSpots);
 
         const wStatus = userStatus(s);
         const regOpen = regCountdown(s).open;
@@ -981,8 +996,8 @@ function renderWeekView(d) {
               <div class="cal-roster-title">
                 <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">group</span> Registered (${regNames.length})</span>
               </div>
-              ${regNames.length 
-                ? `<ol class="cal-roster-list">${regNames.map((n) => `<li>${highlightName(n)}</li>`).join('')}</ol>`
+              ${regEntries.length 
+                ? `<ol class="cal-roster-list">${regEntries.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n)}</li>`).join('')}</ol>`
                 : `<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">None</div>`
               }
 
@@ -1098,9 +1113,6 @@ function renderDayView(d) {
         .map(([n]) => n)
         .sort((a, b) => a.localeCompare(b));
 
-      const half = Math.ceil(regNames.length / 2);
-      const col1 = regNames.slice(0, half);
-      const col2 = regNames.slice(half);
       const uStatus = userStatus(s);
       const userBadgeHtml = userStatusBadgeHtml(uStatus);
       const regOpen = regCountdown(s).open;
@@ -1113,13 +1125,19 @@ function renderDayView(d) {
       const dayOpenSpots = dayRem != null ? dayRem
         : dayCap != null ? Math.max(0, dayCap - regNames.length) : null;
 
-      const makeList = (items, startIdx, hlFn) => 
+      // Extend the roster to capacity so each open spot appears as a numbered blank row.
+      const regEntries = withOpenSlots(regNames, dayOpenSpots);
+      const entryHalf = Math.ceil(regEntries.length / 2);
+      const entryCol1 = regEntries.slice(0, entryHalf);
+      const entryCol2 = regEntries.slice(entryHalf);
+
+      const makeList = (items, startIdx) => 
         `<ol class="people-list" start="${startIdx}">` +
-        items.map((n) => `<li>${hlFn(n)}</li>`).join('') +
+        items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n)}</li>`).join('') +
         `</ol>`;
 
-      const regRosterHtml = regNames.length 
-        ? `<div class="roster-2col"><div>${makeList(col1, 1, highlightName)}</div><div>${col2.length ? makeList(col2, half + 1, highlightName) : ''}</div></div>`
+      const regRosterHtml = regEntries.length 
+        ? `<div class="roster-2col"><div>${makeList(entryCol1, 1)}</div><div>${entryCol2.length ? makeList(entryCol2, entryHalf + 1) : ''}</div></div>`
         : '<div class="empty-state">No registered participants yet</div>';
 
       const waitRosterHtml = waitNames.length
@@ -1205,18 +1223,19 @@ function renderListView(d) {
   log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
   const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
 
-  const renderRegRoster = (s) => {
+  const renderRegRoster = (s, openSpots) => {
     const names = Object.entries(s.people)
       .filter(([, p]) => p.status === 'reg')
       .map(([n]) => n)
       .sort((a, b) => a.localeCompare(b));
-    if (!names.length) return '<div class="empty-state">None</div>';
-    const half = Math.ceil(names.length / 2);
-    const col1 = names.slice(0, half);
-    const col2 = names.slice(half);
+    const entries = withOpenSlots(names, openSpots);
+    if (!entries.length) return '<div class="empty-state">None</div>';
+    const half = Math.ceil(entries.length / 2);
+    const col1 = entries.slice(0, half);
+    const col2 = entries.slice(half);
     const makeList = (items, startIdx) =>
       `<ol class="people-list" start="${startIdx}">` +
-      items.map((n) => `<li>${highlightName(n)}</li>`).join('') +
+      items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n)}</li>`).join('') +
       `</ol>`;
     return `<div class="roster-2col"><div>${makeList(col1, 1)}</div><div>${col2.length ? makeList(col2, half + 1) : ''}</div></div>`;
   };
@@ -1294,7 +1313,7 @@ function renderListView(d) {
           <!-- Registered Roster -->
           <div class="box-container">
             <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${count(s, 'reg')})</div>
-            ${renderRegRoster(s)}
+            ${renderRegRoster(s, listOpenSpots)}
           </div>
 
           <!-- Waitlist -->
