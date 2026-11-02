@@ -596,6 +596,7 @@
       </datalist>
       <label class="switch"><input type="checkbox" id="sortRating" /> sort by doubles</label>
     </div>
+    <p class="hint">Your search is kept in the address bar — copy the link to share these exact results.</p>
   </section>
 
   <div id="banner"></div>
@@ -728,6 +729,23 @@ const playerState = {
   loading: false,
 };
 
+// A ?player= id from a shared link is opened once the search that contains it lands.
+let pendingPlayer = null;
+
+function openPendingPlayer() {
+  const id = pendingPlayer;
+  pendingPlayer = null;
+  if (!id) return;
+  for (const entry of store.entries) {
+    const hit = (entry.hits || []).find((h) => h.id === id);
+    if (!hit) continue;
+    store.picks[entry.query] = hit.id;
+    render();
+    openPlayer(hit);
+    return;
+  }
+}
+
 // no default names: the field starts empty and only remembers what you type locally
 localStorage.removeItem('dupr_names'); // drop the roster cached by earlier builds
 el.names.value = localStorage.getItem('dupr_names_typed') || '';
@@ -743,6 +761,80 @@ const DEFAULT_API_BASE = 'https://5me448fxzl.execute-api.us-east-1.amazonaws.com
 const apiBase = () => (window.DUPR_API_BASE || localStorage.getItem('dupr_api_base') || DEFAULT_API_BASE).replace(/\/+$/, '');
 // Optional per-visitor DUPR cookie; empty means "use the cookie the server is configured with".
 const myCookie = () => localStorage.getItem('dupr_cookie') || '';
+
+// ── shareable search state ───────────────────────────────────────────────────
+// The search on screen lives in the address bar, so copying the link replays it:
+//   ?q=Jane+Doe                 one name
+//   ?names=Jane+Doe%0AJohn+…    roster (newline separated)
+//   ?loc=CT,+MA  &sort=1  &player=<duprId>
+// Pages opened from disk (file://) cannot call history.replaceState(), so there the
+// same query string is kept in the hash instead; both places are read back on load.
+function urlParams() {
+  const merged = new URLSearchParams();
+  try {
+    new URLSearchParams(location.search).forEach((value, key) => merged.set(key, value));
+    const hash = location.hash.replace(/^#/, '');
+    if (hash.includes('=')) new URLSearchParams(hash).forEach((value, key) => merged.set(key, value));
+  } catch { /* no URL access: behave like an empty link */ }
+  return merged;
+}
+
+// "0"/"false"/empty are off; anything else set is on.
+const urlFlag = (value) => value != null && value !== '' && value !== '0' && value !== 'false';
+
+function readUrlState() {
+  const p = urlParams();
+  const q = (p.get('q') || '').trim();
+  const names = (p.get('names') || '').trim();
+  return {
+    mode: names ? 'multi' : q ? 'single' : null,
+    q,
+    names,
+    loc: p.has('loc') ? p.get('loc') : null,
+    sort: p.has('sort') ? urlFlag(p.get('sort')) : null,
+    player: (p.get('player') || '').trim() || null,
+  };
+}
+
+function writeUrl(p) {
+  const query = p.toString();
+  const hashHoldsState = location.hash.slice(1).includes('=');
+  if (!hashHoldsState && query === location.search.replace(/^\?/, '')) return;
+  try {
+    history.replaceState(null, '', location.pathname + (query ? '?' + query : ''));
+    return;
+  } catch { /* file:// refuses the History API */ }
+  try {
+    // Same document, so no reload and no extra history entry.
+    location.replace(location.pathname + (query ? '#' + query : ''));
+  } catch { /* read-only view */ }
+}
+
+// Rewrite the link from what is on screen; `patch` forces extra keys ("" clears one).
+function syncUrl(patch = {}) {
+  const p = urlParams();
+  const state = {
+    q: store.mode === 'single' ? el.singleInput.value.trim() : '',
+    names: store.mode === 'multi'
+      ? el.names.value.split(/\r?\n/).map((n) => n.trim()).filter(Boolean).join('\n')
+      : '',
+    loc: el.locInput.value.trim(),
+    sort: el.sortRating.checked ? '1' : '',
+    ...patch,
+  };
+  for (const [key, value] of Object.entries(state)) {
+    if (value) p.set(key, String(value));
+    else p.delete(key);
+  }
+  writeUrl(p);
+}
+
+function clearUrlKeys(...keys) {
+  const p = urlParams();
+  for (const key of keys) p.delete(key);
+  writeUrl(p);
+}
+
 // ── transport ────────────────────────────────────────────────────────────────
 // The gateway occasionally answers 502/503/504 (cold start, throttling, a deploy in flight) and
 // mobile networks drop connections, so a single retry hides most blips. The timeout stops a hung
@@ -1011,6 +1103,7 @@ function updatePlayerHead(hit, data) {
 
 function openPlayer(hit) {
   playerState.hit = hit;
+  syncUrl({ player: hit.id || '' });
   playerState.seq += 1;
   playerState.matches = [];
   playerState.hasMore = false;
@@ -1150,6 +1243,8 @@ async function runSingle() {
   const query = el.singleInput.value.trim();
   if (!query) { el.singleInput.focus(); return; }
   localStorage.setItem('dupr_single', query);
+  // Put the query in the link before the request so it can be copied right away.
+  syncUrl({ player: '' });
   el.singleGo.disabled = true;
   el.singleGo.innerHTML = '<span class="spin"></span>';
   try {
@@ -1159,6 +1254,7 @@ async function runSingle() {
     store.picks = {};
     if (j.error === 'cookie-rejected') showAuthBanner(j); else el.banner.innerHTML = '';
     render();
+    openPendingPlayer();
   } catch (e) {
     el.banner.innerHTML = `<div class="banner err">${esc(apiErrorText(e))}</div>`;
   } finally {
@@ -1171,6 +1267,7 @@ async function runMulti() {
   const names = el.names.value.split(/\r?\n/).map((n) => n.trim()).filter(Boolean);
   if (!names.length) return;
   localStorage.setItem('dupr_names_typed', el.names.value);
+  syncUrl({ player: '' });
   el.multiGo.disabled = true;
   // Batched so a long roster never trips API Gateway's 30 s integration limit.
   const BATCH = 8;
@@ -1199,6 +1296,7 @@ async function runMulti() {
       el.banner.innerHTML = '';
     }
     render();
+    openPendingPlayer();
   } catch (e) {
     el.banner.innerHTML = `<div class="banner err">${esc(apiErrorText(e))}</div>`;
   } finally {
@@ -1218,6 +1316,8 @@ function setMode(mode) {
   store.entries = [];
   store.picks = {};
   el.resultsPane.hidden = true;
+  // Switching modes drops the results, so the link must stop advertising a search.
+  clearUrlKeys('q', 'names', 'player');
   if (mode === 'single') setTimeout(() => el.singleInput.focus(), 30);
 }
 
@@ -1249,7 +1349,13 @@ el.singleGo.addEventListener('click', runSingle);
 el.singleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSingle(); });
 el.multiGo.addEventListener('click', runMulti);
 el.names.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runMulti(); });
-el.clearBtn.addEventListener('click', () => { el.names.value = ''; store.entries = []; store.picks = {}; el.resultsPane.hidden = true; });
+el.clearBtn.addEventListener('click', () => {
+  el.names.value = '';
+  store.entries = [];
+  store.picks = {};
+  el.resultsPane.hidden = true;
+  clearUrlKeys('names', 'player');
+});
 el.verifyBtn.addEventListener('click', verifyCookie);
 el.settingsBtn.addEventListener('click', () => {
   if (!el.settingsModal.open) el.settingsModal.showModal();
@@ -1298,15 +1404,30 @@ el.settingsResetApi.addEventListener('click', () => {
   checkStatus({ force: true });
 });
 el.settingsClose.addEventListener('click', () => el.settingsModal.close());
-el.playerClose.addEventListener('click', () => el.playerModal.close());
+// Closing drops ?player= right away (the native close event fires too late to be relied on),
+// and the event listener covers Escape.
+function closePlayer() {
+  if (el.playerModal.open) el.playerModal.close();
+  clearUrlKeys('player');
+}
+el.playerClose.addEventListener('click', closePlayer);
 el.playerModal.addEventListener('click', (e) => {
-  if (e.target === el.playerModal) el.playerModal.close();
+  if (e.target === el.playerModal) closePlayer();
 });
+el.playerModal.addEventListener('close', () => clearUrlKeys('player'));
 el.playerBody.addEventListener('click', (e) => {
   if (e.target.closest('#playerMore')) loadMorePlayerMatches();
 });
-el.locInput.addEventListener('input', () => store.entries.length && render());
-el.sortRating.addEventListener('change', () => store.entries.length && render());
+el.locInput.addEventListener('input', () => {
+  if (!store.entries.length) return;
+  syncUrl();
+  render();
+});
+el.sortRating.addEventListener('change', () => {
+  if (!store.entries.length) return;
+  syncUrl();
+  render();
+});
 
 el.results.addEventListener('click', (e) => {
   const row = e.target.closest('.row');
@@ -1396,7 +1517,21 @@ el.cookiePill.addEventListener('click', () => { lastStatusAt = 0; checkStatus({ 
 
 syncSettingsFields();
 checkStatus();
-setMode(store.mode);
+
+// A shared link wins over the values remembered in this browser: restore the filters
+// and re-run the search it describes, so the recipient sees the same results.
+const linkState = readUrlState();
+if (linkState.loc !== null) el.locInput.value = linkState.loc;
+if (linkState.sort !== null) el.sortRating.checked = linkState.sort;
+if (linkState.mode === 'multi') el.names.value = linkState.names;
+else if (linkState.mode === 'single') el.singleInput.value = linkState.q;
+
+setMode(linkState.mode || store.mode);
+if (linkState.mode) {
+  pendingPlayer = linkState.player;
+  if (linkState.mode === 'multi') runMulti();
+  else runSingle();
+}
 </script>
 </body>
 </html>
