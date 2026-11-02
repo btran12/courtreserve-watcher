@@ -2111,23 +2111,68 @@
     .cl-link { margin-left: 0; }
   }
 
-  /* ── Mobile bottom navigation ── */
+  /* ── Mobile bottom navigation: floating glass bar ── */
   @media (max-width: 600px) {
-    body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+    body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 
     .bottom-nav {
       position: fixed;
-      left: 0;
-      right: 0;
-      bottom: 0;
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: calc(12px + env(safe-area-inset-bottom));
       z-index: 900;
       display: flex;
-      background: var(--md-surface);
-      border-top: 1px solid var(--md-outline);
-      box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-      padding-bottom: env(safe-area-inset-bottom);
+      gap: 2px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 0 12px 6px rgba(255, 255, 255, 0.6);
+      overflow: hidden;
+    }
+
+    /* Glass edge highlights */
+    .bottom-nav::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.8),
+        transparent
+      );
+      pointer-events: none;
+    }
+
+    .bottom-nav::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 100%;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.8),
+        transparent,
+        rgba(255, 255, 255, 0.3)
+      );
+      pointer-events: none;
+    }
+
+    /* Where backdrop blur is unavailable, fall back to an opaque surface. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .bottom-nav { background: rgba(255, 255, 255, 0.92); }
     }
 
     .bottom-nav-item {
@@ -2162,13 +2207,13 @@
       color: var(--md-primary);
       font-weight: 600;
     }
-    .bottom-nav-item[aria-current="page"] .bottom-nav-icon { background: rgba(25, 118, 210, 0.12); }
+    .bottom-nav-item[aria-current="page"] .bottom-nav-icon { background: rgba(25, 118, 210, 0.16); }
     .bottom-nav-item[aria-current="page"] .material-symbols-outlined { font-variation-settings: 'FILL' 1; }
-    .bottom-nav-item:active .bottom-nav-icon { background: rgba(25, 118, 210, 0.16); }
+    .bottom-nav-item:active .bottom-nav-icon { background: rgba(25, 118, 210, 0.22); }
 
-    /* Keep toasts above the bar */
+    /* Keep toasts above the floating bar */
     .toast-container {
-      bottom: calc(72px + env(safe-area-inset-bottom));
+      bottom: calc(96px + env(safe-area-inset-bottom));
       right: 12px;
     }
   }

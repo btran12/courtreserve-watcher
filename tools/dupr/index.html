@@ -310,7 +310,7 @@
   /* ── mobile ─────────────────────────────────────────────────────────────── */
   @media (max-width: 640px) {
     body {
-      padding: 16px max(12px, env(safe-area-inset-right)) calc(72px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      padding: 16px max(12px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
     }
     .wrap { gap: 14px; }
 
@@ -325,14 +325,50 @@
     .nav-menu { display: none; }
 
     .bottom-nav {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+      position: fixed;
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      bottom: calc(12px + env(safe-area-inset-bottom));
+      z-index: 30;
       display: flex;
-      background: var(--surface);
-      border-top: 1px solid var(--line);
-      box-shadow: 0 -4px 14px rgba(5, 21, 94, .06);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
-      padding-bottom: env(safe-area-inset-bottom);
+      gap: 2px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+        inset 0 0 12px 6px rgba(255, 255, 255, 0.6);
+      overflow: hidden;
+    }
+    /* Glass edge highlights */
+    .bottom-nav::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+      pointer-events: none;
+    }
+    .bottom-nav::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 100%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), transparent, rgba(255, 255, 255, 0.3));
+      pointer-events: none;
+    }
+    /* Where backdrop blur is unavailable, fall back to an opaque surface. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .bottom-nav { background: rgba(255, 255, 255, 0.92); }
     }
     .bottom-nav-item {
       flex: 1 1 0; min-width: 0; min-height: 56px;
