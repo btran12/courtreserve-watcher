@@ -864,18 +864,23 @@
   }
 
   .day-ribbon {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
+    position: relative;
+    display: flex;
+    gap: 6px;
     background: var(--md-surface);
     padding: 8px;
     border-radius: var(--radius-card);
     border: 1px solid var(--md-outline);
     box-shadow: var(--shadow-1);
     overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
   }
 
   .day-ribbon-btn {
+    flex: 0 0 auto;
     border: 1px solid transparent;
     background: transparent;
     border-radius: 10px;
@@ -887,6 +892,21 @@
     gap: 2px;
     transition: all 0.15s;
     min-width: 48px;
+  }
+
+  /* Small break between weeks on the long day strip. */
+  .day-ribbon-btn.week-gap {
+    margin-left: 8px;
+  }
+
+  /* Touch devices swipe the strip, so keep the scrollbar out of the way there. */
+  @media (hover: none) {
+    .day-ribbon {
+      scrollbar-width: none;
+    }
+    .day-ribbon::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   .day-ribbon-btn:hover {
@@ -1516,20 +1536,36 @@
     font-weight: 600;
   }
 
-  /* ── Swipe transition ── */
+  /* ── Day view swipe navigation ── */
   .day-view-container {
     touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
+    overscroll-behavior-x: contain;
   }
-  .day-view-container.swiping {
+  .day-view-container.is-swiping {
     transition: none;
+    will-change: transform;
   }
-  .day-slots-wrapper {
-    transition: transform 0.25s ease;
+
+  /* Slide the incoming day in from the side the user swiped from. */
+  #viewContainer.day-slide-in {
+    animation: daySlideFromLeft 0.22s cubic-bezier(0.2, 0.7, 0.3, 1) both;
   }
-  .day-slots-wrapper.swipe-return {
-    transition: transform 0.25s ease;
+  #viewContainer.day-slide-in.from-next {
+    animation-name: daySlideFromRight;
+  }
+  @keyframes daySlideFromLeft {
+    from { opacity: 0.4; transform: translateX(-26px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes daySlideFromRight {
+    from { opacity: 0.4; transform: translateX(26px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #viewContainer.day-slide-in { animation: none; }
+    .day-view-container { transition: none !important; }
   }
 
   /* ── Activity view (compact list) ── */

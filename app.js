@@ -36,6 +36,10 @@ let currentView = (() => {
 })();
 let selectedDate = new Date();
 let dateInitialized = false;
+// Direction of the last day-view change, so the new day can slide in from the side it came from.
+let daySlideDir = null;
+// Date the day ribbon was last scrolled for, so a data refresh keeps the user's scroll position.
+let ribbonCenteredFor = null;
 
 // Restore view/date from URL if present (overrides localStorage / defaults)
 restoreFromUrl();
@@ -586,6 +590,12 @@ function toDateStr(d) {
   return `${y}-${m}-${day}`;
 }
 
+function addDays(date, days) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
 function getWeekDays(date) {
   const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
   const day = d.getDay();
@@ -674,6 +684,7 @@ function navToday() {
 function navPrev() {
   if (currentView === 'day') {
     selectedDate.setDate(selectedDate.getDate() - 1);
+    daySlideDir = 'prev';
   } else {
     selectedDate.setDate(selectedDate.getDate() - 7);
   }
@@ -684,6 +695,7 @@ function navPrev() {
 function navNext() {
   if (currentView === 'day') {
     selectedDate.setDate(selectedDate.getDate() + 1);
+    daySlideDir = 'next';
   } else {
     selectedDate.setDate(selectedDate.getDate() + 7);
   }
@@ -750,6 +762,10 @@ function renderCurrentView() {
     viewHtml = renderListView(currentData);
   }
 
+  // Keep the day ribbon where the user left it when the same day is re-rendered (e.g. data refresh).
+  const prevRibbon = currentView === 'day' ? document.querySelector('#viewContainer .day-ribbon') : null;
+  const prevRibbonScroll = prevRibbon ? prevRibbon.scrollLeft : null;
+
   app.innerHTML = `
     <div class="nav-toolbar">
       <div class="view-segmented-btn">
@@ -791,7 +807,37 @@ function renderCurrentView() {
     </div>
   `;
 
-  if (currentView === 'day') setTimeout(attachSwipeHandlers, 150);
+  if (currentView === 'day') {
+    const ribbon = document.querySelector('#viewContainer .day-ribbon');
+    const activeDayBtn = ribbon ? ribbon.querySelector('.day-ribbon-btn.active') : null;
+    if (ribbon && activeDayBtn) {
+      const dateKey = toDateStr(selectedDate);
+      if (prevRibbonScroll !== null && ribbonCenteredFor === dateKey) {
+        ribbon.scrollLeft = prevRibbonScroll;
+      } else {
+        // Only move the strip when the selected day is not already comfortably visible.
+        const pad = 24;
+        const left = activeDayBtn.offsetLeft;
+        const right = left + activeDayBtn.offsetWidth;
+        if (left < ribbon.scrollLeft + pad || right > ribbon.scrollLeft + ribbon.clientWidth - pad) {
+          ribbon.scrollLeft = Math.max(0, left - (ribbon.clientWidth - activeDayBtn.offsetWidth) / 2);
+        }
+      }
+      ribbonCenteredFor = dateKey;
+    }
+
+    if (daySlideDir) {
+      const container = document.getElementById('viewContainer');
+      if (container) {
+        container.classList.add('day-slide-in', `from-${daySlideDir}`);
+        container.addEventListener('animationend', () => {
+          container.classList.remove('day-slide-in', 'from-prev', 'from-next');
+        }, { once: true });
+      }
+      daySlideDir = null;
+    }
+    attachSwipeHandlers();
+  }
 }
 
 function renderWeekView(d) {
@@ -913,7 +959,6 @@ function renderWeekView(d) {
 }
 
 function renderDayView(d) {
-  const weekDays = getWeekDays(selectedDate);
   const selectedDateStr = toDateStr(selectedDate);
   const todayStr = toDateStr(new Date());
 
@@ -925,16 +970,32 @@ function renderDayView(d) {
     slotsByDate[s.date].push(s);
   }
 
-  const ribbonHtml = weekDays.map((day) => {
+  // The ribbon is a long, horizontally scrollable strip anchored on today, so future dates are one
+  // flick away instead of requiring the arrows. It grows only if the selected day falls outside.
+  const todayMid = new Date();
+  const selectedMid = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
+  const stripBaseFirst = getWeekDays(addDays(todayMid, -7))[0];
+  const stripBaseLast = getWeekDays(addDays(todayMid, 56))[6];
+  const stripFirst = selectedMid < stripBaseFirst ? getWeekDays(selectedMid)[0] : stripBaseFirst;
+  const stripLast = selectedMid > stripBaseLast ? getWeekDays(selectedMid)[6] : stripBaseLast;
+
+  const ribbonDays = [];
+  for (let day = stripFirst; day <= stripLast; day = addDays(day, 1)) ribbonDays.push(day);
+
+  const ribbonHtml = ribbonDays.map((day, i) => {
     const dStr = toDateStr(day);
     const isActive = dStr === selectedDateStr;
     const isToday = dStr === todayStr;
     const hasSlots = (slotsByDate[dStr] || []).length > 0;
     const dName = day.toLocaleDateString(undefined, { weekday: 'short' });
     const dNum = day.getDate();
+    const weekGap = day.getDay() === 1 && i > 0 ? ' week-gap' : '';
+    const fullLabel = day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
     return `
-      <button class="day-ribbon-btn ${isActive ? 'active' : ''} ${isToday ? 'is-today' : ''}" onclick="selectDay('${dStr}')" title="${dName}, ${dStr}">
+      <button class="day-ribbon-btn ${isActive ? 'active' : ''} ${isToday ? 'is-today' : ''}${weekGap}"
+              onclick="selectDay('${dStr}')" title="${dName}, ${dStr}" aria-label="${fullLabel}"
+              ${isActive ? 'aria-current="date"' : ''}>
         <span class="ribbon-day-name">${dName}</span>
         <span class="ribbon-day-val">${dNum}</span>
         ${hasSlots ? `<div class="ribbon-event-dot"></div>` : `<div style="height:6px; margin-top:2px;"></div>`}
@@ -953,7 +1014,7 @@ function renderDayView(d) {
       <div class="box-container" style="text-align:center; padding:48px 16px; margin-top:12px;">
         <span class="material-symbols-outlined" style="font-size:48px; color:#bdbdbd; margin-bottom:8px;">event_busy</span>
         <h3 style="margin:0 0 6px 0; color:var(--md-on-surface);">No events scheduled for this day</h3>
-        <p style="color:var(--md-on-surface-variant); font-size:0.875rem; margin:0 0 16px 0;">Use the ribbon above or arrows to navigate to dates with events.</p>
+        <p style="color:var(--md-on-surface-variant); font-size:0.875rem; margin:0 0 16px 0;">Swipe left or right, or use the ribbon above, to browse nearby days.</p>
         <button class="nav-btn" onclick="navToday()"><span class="material-symbols-outlined" style="font-size:16px;">today</span> Go to Today</button>
       </div>
     `;
@@ -1322,45 +1383,155 @@ function render(d) {
 }
 
 
-// ── Swipe handlers for all views ──
+// ── Day view swipe navigation ──
+// One gesture handles touch, pen, mouse drags and horizontal trackpad scrolls, and moves the
+// selected day by one. Text fields are left alone so typing and caret placement keep working;
+// anywhere else a horizontal swipe wins over the link/button under the finger.
+const SWIPE_MIN_DISTANCE = 56;   // px the finger/mouse must travel
+const SWIPE_MIN_VELOCITY = 0.4;  // px per ms, a quick flick counts even when short
+const WHEEL_SWIPE_ACCUM = 72;    // summed horizontal wheel delta before changing day
+const DAY_NAV_COOLDOWN = 240;    // ms between day changes, prevents double-fire
+const TEXT_INPUT_SELECTOR = 'input, textarea, select, [contenteditable="true"]';
+
+let dayNavCooldownUntil = 0;
+let wheelAccum = 0;
+let wheelResetTimer = null;
+let suppressClickUntil = 0;
+
+// A swipe often ends on top of a link or button; swallow the click it would otherwise fire.
+document.addEventListener('click', (event) => {
+  if (performance.now() < suppressClickUntil) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+}, true);
+
+function navigateDay(direction) {
+  if (currentView !== 'day') return;
+  const now = performance.now();
+  if (now < dayNavCooldownUntil) return;
+  dayNavCooldownUntil = now + DAY_NAV_COOLDOWN;
+  if (direction === 'prev') navPrev(); else navNext();
+}
+
 function attachSwipeHandlers() {
   const container = document.getElementById('viewContainer');
   if (!container || container.dataset.swipeBound === currentView) return;
   container.dataset.swipeBound = currentView;
 
-  let startX = 0, startY = 0, swiping = false;
-  const threshold = 60;
+  const surface = container.querySelector('.day-view-container');
+  if (!surface) return;
 
-  container.addEventListener('touchstart', (e) => {
-    if (e.target.closest('button') || e.target.closest('a') || e.target.closest('summary') || e.target.closest('input')) return;
-    startX = e.touches[0].clientX;
-    startY = e.touches[0].clientY;
-    swiping = true;
-  }, { passive: true });
+  let drag = null;
 
-  container.addEventListener('touchmove', (e) => {
-    if (!swiping) return;
-    const dx = e.touches[0].clientX - startX;
-    const dy = e.touches[0].clientY - startY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
-      e.preventDefault();
-    }
-  }, { passive: false });
+  const resetSurface = () => {
+    if (drag) return; // a new gesture took over while the old one was settling
+    surface.style.transition = '';
+    surface.style.transform = '';
+    surface.classList.remove('is-swiping');
+  };
 
-  container.addEventListener('touchend', (e) => {
-    if (!swiping) return;
-    swiping = false;
-    const dx = e.changedTouches[0].clientX - startX;
-    const dy = e.changedTouches[0].clientY - startY;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > threshold) {
-      if (dx > 0) {
-        navPrev();
-      } else {
-        navNext();
+  // Ease the content back into place when the gesture was too small to change the day.
+  const settle = () => {
+    surface.style.transition = 'transform 0.18s ease';
+    surface.style.transform = '';
+    surface.addEventListener('transitionend', resetSurface, { once: true });
+    setTimeout(resetSurface, 260);
+  };
+
+  container.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    // The ribbon scrolls on its own; leave its gestures to the browser.
+    if (event.target.closest('.day-ribbon')) return;
+    if (event.target.closest(TEXT_INPUT_SELECTOR)) return;
+    drag = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      time: performance.now(),
+      axis: null,
+    };
+  });
+
+  container.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+
+    // Decide once whether this is a horizontal swipe or a normal vertical scroll.
+    if (!drag.axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      drag.axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? 'x' : 'y';
+      if (drag.axis === 'x') {
+        try { container.setPointerCapture(event.pointerId); } catch { /* not supported */ }
+        surface.style.transition = 'none';
+        surface.classList.add('is-swiping');
+        suppressClickUntil = performance.now() + 400;
       }
     }
+    if (drag.axis !== 'x') return;
+
+    event.preventDefault();
+    const offset = Math.max(-90, Math.min(90, dx * 0.4));
+    surface.style.transform = `translateX(${offset}px)`;
   });
+
+  const endDrag = (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const gesture = drag;
+    drag = null;
+    if (gesture.axis !== 'x') { resetSurface(); return; }
+
+    const dx = event.clientX - gesture.x;
+    const elapsed = Math.max(1, performance.now() - gesture.time);
+    const fastEnough = Math.abs(dx) / elapsed > SWIPE_MIN_VELOCITY && Math.abs(dx) > 24;
+    const changed = Math.abs(dx) > SWIPE_MIN_DISTANCE || fastEnough;
+
+    if (!changed) { settle(); return; }
+    resetSurface();
+    navigateDay(dx > 0 ? 'prev' : 'next');
+  };
+
+  container.addEventListener('pointerup', endDrag);
+  container.addEventListener('pointercancel', () => {
+    if (!drag) return;
+    drag = null;
+    settle();
+  });
+
+  // Trackpads report horizontal swipes as wheel deltas, not pointer events.
+  container.addEventListener('wheel', (event) => {
+    if (event.ctrlKey) return; // pinch-zoom
+    if (event.target.closest('.day-ribbon')) return; // the strip scrolls itself
+    if (Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+    event.preventDefault();
+    if (performance.now() < dayNavCooldownUntil) return;
+
+    wheelAccum += event.deltaX;
+    clearTimeout(wheelResetTimer);
+    wheelResetTimer = setTimeout(() => { wheelAccum = 0; }, 150);
+
+    if (Math.abs(wheelAccum) < WHEEL_SWIPE_ACCUM) return;
+    const direction = wheelAccum > 0 ? 'prev' : 'next';
+    wheelAccum = 0;
+    navigateDay(direction);
+  }, { passive: false });
 }
+
+// Arrow keys do the same on desktop, as long as the user is not typing and no overlay is open.
+document.addEventListener('keydown', (event) => {
+  if (currentView !== 'day' || courtsModalDate) return;
+  if (document.body.classList.contains('nav-open') || document.querySelector('dialog[open]')) return;
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+  if (event.target.closest && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    navigateDay('prev');
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    navigateDay('next');
+  }
+});
 
 
 async function load() {
