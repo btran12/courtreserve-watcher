@@ -25,10 +25,29 @@
     </div>
   </div>
   <div class="header-actions">
+    <div class="nav-menu" id="navMenu">
+      <button class="header-btn nav-menu-btn" id="navMenuBtn" type="button"
+              aria-expanded="false" aria-controls="navMenuPanel"
+              title="Open menu" aria-label="Open menu">
+        <span class="material-symbols-outlined">menu</span>
+        <span class="btn-label">Menu</span>
+      </button>
+      <nav class="nav-menu-panel" id="navMenuPanel" aria-label="Pages" hidden>
+        <a class="nav-menu-item" href="index.html" aria-current="page">
+          <span class="material-symbols-outlined nav-menu-icon">calendar_month</span>
+          <span class="nav-menu-text"><b>CourtReserve Watcher</b><small>Court availability</small></span>
+          <span class="material-symbols-outlined nav-menu-check">check</span>
+        </a>
+        <a class="nav-menu-item" href="tools/dupr/index.html">
+          <span class="material-symbols-outlined nav-menu-icon">person_search</span>
+          <span class="nav-menu-text"><b>DUPR lookup</b><small>Ratings &amp; match history</small></span>
+        </a>
+      </nav>
+    </div>
     <div class="user-name-wrap">
       <span id="userNameDisplay" class="user-welcome">
         <span class="material-symbols-outlined" style="font-size:18px;">person</span>
-        <span class="welcome-text">Welcome, <b id="welcomeName"></b></span>
+        <span class="welcome-text"><span class="welcome-prefix">Welcome, </span><b id="welcomeName"></b></span>
         <span class="material-symbols-outlined edit-name-btn" title="Edit name">edit</span>
       </span>
       <span id="userNameInputWrap" class="user-input-wrap">
@@ -47,6 +66,37 @@
 </main>
 
 <script src="app.js" defer></script>
+<script>
+// Header page menu: toggles the navigation panel and closes it on outside click / Escape.
+(() => {
+  const menu = document.getElementById('navMenu');
+  const btn = document.getElementById('navMenuBtn');
+  const panel = document.getElementById('navMenuPanel');
+  if (!menu || !btn || !panel) return;
+
+  const setOpen = (open) => {
+    panel.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+  };
+
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setOpen(panel.hidden);
+  });
+  document.addEventListener('click', (event) => {
+    if (!panel.hidden && !menu.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !panel.hidden) {
+      setOpen(false);
+      btn.focus();
+    }
+  });
+  panel.addEventListener('click', (event) => {
+    if (event.target.closest('a')) setOpen(false);
+  });
+})();
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   // Only reload when this page was already running under a worker: on a first visit the page
@@ -103,5 +153,17 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
 </div>
+
+<!-- Mobile bottom navigation -->
+<nav class="bottom-nav" aria-label="Pages">
+  <a class="bottom-nav-item" href="index.html" aria-current="page">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">calendar_month</span></span>
+    <span class="bottom-nav-label">Watcher</span>
+  </a>
+  <a class="bottom-nav-item" href="tools/dupr/index.html">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">person_search</span></span>
+    <span class="bottom-nav-label">DUPR</span>
+  </a>
+</nav>
 </body>
 </html>
