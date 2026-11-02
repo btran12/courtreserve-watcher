@@ -367,8 +367,8 @@
 <div class="wrap">
   <header>
     <div class="brand">
-      <div class="brand-mark">DU</div>
-      <h1>DUPR lookup<span>api.dupr.com via local proxy</span></h1>
+      <div class="brand-mark">F-D</div>
+      <h1>Free DUPR</h1>
     </div>
     <div class="spacer"></div>
     <span class="pill" id="cookiePill">checking…</span>
@@ -389,13 +389,11 @@
         <input class="search-input" id="singleInput" type="search" placeholder="Search a player by full name…" aria-label="Player name" enterkeyhint="search" autocapitalize="words" autocomplete="off" spellcheck="false" />
         <button class="primary search-go" id="singleGo" type="button">Search</button>
       </div>
-      <p class="hint">Enter searches DUPR and lists every same-name profile — narrow it with the location filter.
-        Click a result to see their profile and recent matches.</p>
     </div>
 
     <div id="multiPane" hidden>
       <textarea id="names" spellcheck="false" aria-label="Names to look up, one per line"
-                placeholder="John Doe&#10;Jane Doe"></textarea>
+                placeholder="John Doe&#10;Jane Doe&#10;Jane Doe&#10;Jane Doe"></textarea>
       <div class="multi-actions">
         <button class="primary" id="multiGo" type="button">Look up all</button>
         <button class="ghost" id="clearBtn" type="button">Clear</button>
@@ -406,7 +404,7 @@
     <div class="filters">
       <span class="field">
         <label for="locInput">Location</label>
-        <input id="locInput" type="text" list="locList" placeholder="CT, MA" value="CT, MA" autocomplete="off" spellcheck="false" />
+        <input id="locInput" type="text" list="locList" placeholder="CT, MA or New York, NY" value="CT, MA" autocomplete="off" spellcheck="false" />
       </span>
       <datalist id="locList">
         <option value="CT, MA"></option>
@@ -418,11 +416,6 @@
       </datalist>
       <label class="switch"><input type="checkbox" id="sortRating" /> sort by doubles</label>
     </div>
-    <p class="hint">
-      Location matches the address DUPR returns (e.g. <em>Granby, CT, US</em>): a <strong>2-letter</strong> entry must equal the state code,
-      anything longer is matched inside the city/state text. Comma-separate for several (<code>CT, MA</code>), leave empty for all locations.
-      Only the first 30 same-name hits per name are scanned.
-    </p>
   </section>
 
   <div id="banner"></div>
@@ -445,12 +438,12 @@
   <div class="modal-body">
     <div class="settings">
       <span class="field">
-        <label for="cookieField">Your DUPR cookie</label>
-        <input id="cookieField" type="text" placeholder="__Host-dupr_at=eyJ…" autocomplete="off" spellcheck="false" />
+        <label for="cookieField">Your DUPR cookie </label>
+        <input id="cookieField" type="text" placeholder="__Host-dupr_at=eyJ… (optional)" autocomplete="off" spellcheck="false" />
       </span>
       <span class="field">
         <label for="tokenField">API key</label>
-        <input id="tokenField" type="text" placeholder="x-dupr-token (optional)" autocomplete="off" spellcheck="false" />
+        <input id="tokenField" type="text" placeholder="x-dupr-token (required)" autocomplete="off" spellcheck="false" />
       </span>
     </div>
     <p class="hint">Kept in this browser only (<code>localStorage</code>). Your cookie is sent as
