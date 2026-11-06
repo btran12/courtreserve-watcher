@@ -36,8 +36,9 @@ let currentView = (() => {
 })();
 let selectedDate = new Date();
 let dateInitialized = false;
-// Direction of the last day-view change, so the new day can slide in from the side it came from.
-let daySlideDir = null;
+// One-shot animation for the next renderCurrentView(): 'enter' after a view switch or first visit,
+// 'prev'/'next' for directional navigation, null for background data refreshes (leave it still).
+let pendingViewAnim = 'enter';
 // Date the day ribbon was last scrolled for, so a data refresh keeps the user's scroll position.
 let ribbonCenteredFor = null;
 
@@ -657,6 +658,52 @@ function firstEventNumber(snapshot) {
   return typeof e === 'string' ? snapshot.key : (e.number || snapshot.key);
 }
 
+// ── Expected games per player ──
+// Doubles fills 4 spots per court, so at 15 minutes per game one round of games gives every
+// player on a court one game. The venue runs these sessions on four courts by default (an event
+// may carry its own `courts` count); when more players turn up than the courts can seat, they
+// rotate and share the available game slots.
+const GAME_MINUTES = 15;
+const DEFAULT_EVENT_MINUTES = 120; // snapshots written before durationMin existed
+const DEFAULT_COURTS = 4; // venue default when the data does not say otherwise
+
+function eventMinutes(evt) {
+  return evt && evt.durationMin > 0 ? evt.durationMin : DEFAULT_EVENT_MINUTES;
+}
+
+// One chip for a group of players sharing `courts` courts (4 players per court, 15-minute games).
+function gamesChipFor(players, minutes, label, courts = DEFAULT_COURTS) {
+  if (!players) return '';
+  const rounds = minutes / GAME_MINUTES;
+  const games = rounds * Math.min(1, (courts * 4) / players);
+  const rounded = games >= 10 ? Math.round(games) : Math.round(games * 10) / 10;
+  const shown = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  const hours = Math.floor(minutes / 60);
+  const length = minutes % 60 === 0
+    ? `${hours}h`
+    : `${hours ? `${hours}h ` : ''}${minutes % 60}m`;
+  const tip = `${label ? `${label} · ` : ''}${players} players · ${courts} court${courts === 1 ? '' : 's'} · ${length} session · ${GAME_MINUTES} min per game`;
+  return `<span class="chip chip-games" title="${esc(tip)}"><span class="material-symbols-outlined" style="font-size:13px">sports_score</span> ≈${shown} games in ${hours} hours</span>`;
+}
+
+function gamesChipHtml(evt) {
+  const players = (evt.reg || []).length || evt.signed || evt.capacity || 0;
+  return gamesChipFor(players, eventMinutes(evt), '', evt.courts || DEFAULT_COURTS);
+}
+
+// Merged events share one day card, so they get one combined estimate: the players of every
+// event in the slot are pooled, the courts stay the venue default, and the longest session sets
+// the number of rounds.
+function slotGamesChipHtml(snapshot) {
+  const evts = (snapshot.events || []).filter((e) => e && typeof e === 'object');
+  if (!evts.length) return '';
+  if (evts.length === 1) return gamesChipHtml(evts[0]);
+  const players = evts.reduce((n, e) => n + ((e.reg || []).length || e.signed || e.capacity || 0), 0);
+  const minutes = Math.max(...evts.map(eventMinutes));
+  const courts = Math.max(...evts.map((e) => e.courts || DEFAULT_COURTS));
+  return gamesChipFor(players, minutes, `${evts.length} events`, courts);
+}
+
 function toDateStr(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -724,6 +771,26 @@ function getRelativeDateLabel(dateStr) {
   return `${Math.abs(diffDays)} days ago`;
 }
 
+// Groups activity rows by the calendar day a change was detected.
+function activityDayKey(ts) {
+  const d = new Date(ts);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function activityDayLabel(ts) {
+  const d = new Date(ts);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function activityDaySeparator(ts) {
+  return `<div class="activity-day-separator"><span>${esc(activityDayLabel(ts))}</span></div>`;
+}
+
 function initDateIfNeeded(data) {
   if (dateInitialized || !data || !data.snapshots) return;
   dateInitialized = true;
@@ -748,6 +815,7 @@ function setView(view) {
   currentView = view;
   localStorage.setItem('crw_view', view);
   closeCourtsModal();
+  pendingViewAnim = 'enter';
   syncUrl();
   renderCurrentView();
   // Attach swipe handlers when entering day view
@@ -756,35 +824,33 @@ function setView(view) {
 
 function navToday() {
   selectedDate = new Date();
+  pendingViewAnim = 'enter';
   syncUrl();
   renderCurrentView();
 }
 
 function navPrev() {
-  if (currentView === 'day') {
-    selectedDate.setDate(selectedDate.getDate() - 1);
-    daySlideDir = 'prev';
-  } else {
-    selectedDate.setDate(selectedDate.getDate() - 7);
-  }
+  selectedDate.setDate(selectedDate.getDate() - (currentView === 'day' ? 1 : 7));
+  pendingViewAnim = 'prev';
   syncUrl();
   renderCurrentView();
 }
 
 function navNext() {
-  if (currentView === 'day') {
-    selectedDate.setDate(selectedDate.getDate() + 1);
-    daySlideDir = 'next';
-  } else {
-    selectedDate.setDate(selectedDate.getDate() + 7);
-  }
+  selectedDate.setDate(selectedDate.getDate() + (currentView === 'day' ? 1 : 7));
+  pendingViewAnim = 'next';
   syncUrl();
   renderCurrentView();
 }
 
 function selectDay(dateStr) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  selectedDate = new Date(y, m - 1, d);
+  const nextDate = new Date(y, m - 1, d);
+  const prevKey = toDateStr(selectedDate);
+  const nextKey = toDateStr(nextDate);
+  // Slide in from the side the chosen day sits on, so ribbon taps match swipe navigation.
+  pendingViewAnim = nextKey === prevKey ? 'enter' : nextKey < prevKey ? 'prev' : 'next';
+  selectedDate = nextDate;
   currentView = 'day';
   localStorage.setItem('crw_view', 'day');
   syncUrl();
@@ -845,6 +911,10 @@ function renderCurrentView() {
   const prevRibbon = currentView === 'day' ? document.querySelector('#viewContainer .day-ribbon') : null;
   const prevRibbonScroll = prevRibbon ? prevRibbon.scrollLeft : null;
 
+  // Consume the one-shot animation so later data refreshes re-render without motion.
+  const anim = pendingViewAnim;
+  pendingViewAnim = null;
+
   app.innerHTML = `
     <div class="nav-toolbar">
       <div class="view-segmented-btn">
@@ -886,6 +956,17 @@ function renderCurrentView() {
     </div>
   `;
 
+  const viewContainer = document.getElementById('viewContainer');
+  if (viewContainer && (anim === 'prev' || anim === 'next')) {
+    // Directional navigation slides the whole view in from the side it came from.
+    viewContainer.classList.add('view-slide-in', `from-${anim}`);
+    viewContainer.addEventListener('animationend', () => {
+      viewContainer.classList.remove('view-slide-in', 'from-prev', 'from-next');
+    }, { once: true });
+  } else if (anim === 'enter') {
+    animateViewContent(viewContainer);
+  }
+
   if (currentView === 'day') {
     const ribbon = document.querySelector('#viewContainer .day-ribbon');
     const activeDayBtn = ribbon ? ribbon.querySelector('.day-ribbon-btn.active') : null;
@@ -904,19 +985,30 @@ function renderCurrentView() {
       }
       ribbonCenteredFor = dateKey;
     }
-
-    if (daySlideDir) {
-      const container = document.getElementById('viewContainer');
-      if (container) {
-        container.classList.add('day-slide-in', `from-${daySlideDir}`);
-        container.addEventListener('animationend', () => {
-          container.classList.remove('day-slide-in', 'from-prev', 'from-next');
-        }, { once: true });
-      }
-      daySlideDir = null;
-    }
     attachSwipeHandlers();
   }
+}
+
+// Cards and sections that rise in with a small stagger when the user changes view or day.
+const VIEW_ENTER_TARGETS = [
+  '#viewContainer > .day-view-container > *',
+  '#viewContainer > .calendar-week-container .week-day-col',
+  '#viewContainer > .section-title',
+  '#viewContainer > details.card',
+  '#viewContainer > .log-card',
+  '#viewContainer > .activity-view-container',
+].join(',');
+
+function animateViewContent(container) {
+  if (!container) return;
+  container.querySelectorAll(VIEW_ENTER_TARGETS).forEach((el, i) => {
+    el.style.setProperty('--anim-order', String(Math.min(i, 12)));
+    el.classList.add('anim-in');
+    el.addEventListener('animationend', () => {
+      el.classList.remove('anim-in');
+      el.style.removeProperty('--anim-order');
+    }, { once: true });
+  });
 }
 
 function renderWeekView(d) {
@@ -988,6 +1080,7 @@ function renderWeekView(d) {
                 <span class="cal-badge cal-badge-reg"><span class="material-symbols-outlined" style="font-size:12px">group</span> ${regNames.length} reg</span>
                 <span class="cal-badge cal-badge-wait"><span class="material-symbols-outlined" style="font-size:12px">hourglass_empty</span> ${waitNames.length} wait</span>
                 ${openSpots != null ? (openSpots === 0 ? `<span class="cal-badge cal-badge-full"><span class="material-symbols-outlined" style="font-size:12px">block</span> Full</span>` : `<span class="cal-badge cal-badge-open"><span class="material-symbols-outlined" style="font-size:12px">event_available</span> ${openSpots} open</span>`) : ''}
+                ${slotGamesChipHtml(s)}
               </div>
             </div>
 
@@ -1144,14 +1237,24 @@ function renderDayView(d) {
         ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>`
         : '<div class="empty-state">No one on the waitlist</div>';
 
-      const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
-        `<div class="row">
+      const slotLog = log.filter((l) => l.slot === s.key).slice(0, 50);
+      let lastActivityDay = '';
+      const ch = slotLog.map((l) => {
+        const day = activityDayKey(l.ts);
+        const separator = day !== lastActivityDay ? activityDaySeparator(l.ts) : '';
+        lastActivityDay = day;
+        return `${separator}
+        <div class="row">
           <div class="row-main">
             <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} </span>
             <b>${esc(l.name)} </b> <span class="action-type">- ${esc(TEXT[l.type] || l.type)}</span>
           </div>
           <div class="time">${new Date(l.ts).toLocaleString()}</div>
-        </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
+        </div>`;
+      }).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
+
+      // Merged events share the card, so they share one combined games estimate.
+      const slotGames = slotGamesChipHtml(s);
 
       return `
         <div class="day-slot-card">
@@ -1174,6 +1277,7 @@ function renderDayView(d) {
                 <span class="chip chip-reg"><span class="material-symbols-outlined" style="font-size:13px">group</span> ${regNames.length} out of ${dayCap || '?'} registered</span>
                 <span class="chip chip-wait"><span class="material-symbols-outlined" style="font-size:13px">hourglass_empty</span> ${waitNames.length} waitlist</span>
                 ${dayOpenSpots != null ? (dayOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span> Event FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${dayOpenSpots} spots open</span>`) : ''}
+                ${slotGames}
               </div>
             </div>
             <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
@@ -1295,6 +1399,7 @@ function renderListView(d) {
           <span class="chip chip-reg">${count(s, 'reg')} out of ${listCap || '?'} registered</span>
           <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
           ${listOpenSpots != null ? (listOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span>Event FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${listOpenSpots} spots open</span>`) : ''}
+          ${slotGamesChipHtml(s)}
           ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Last updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
           
         </div>
@@ -1307,8 +1412,7 @@ function renderListView(d) {
           <div class="box-container">
             <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
             ${ch}
-          </div>
-        </div>`
+          </div>`
           : `<div class="event-grid event-grid-stacked">
           <!-- Registered Roster -->
           <div class="box-container">
@@ -1326,7 +1430,7 @@ function renderListView(d) {
           <div class="box-container">
             <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
             ${ch}
-          </div>`
+          </div></div>`
         }
       </div>
     </details>`;
@@ -1384,28 +1488,12 @@ function renderActivityView(d) {
   };
 
   // Group rows by the day the change was detected so dates are easy to scan.
-  const dayKey = (ts) => {
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-  };
-  const dayLabel = (ts) => {
-    const d = new Date(ts);
-    const today = new Date();
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    if (d.toDateString() === today.toDateString()) return 'Today';
-    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
   let lastDay = '';
   const rows = log.map((l) => {
     const tone = cls(l.type) === 'j' ? '#2e7d32' : cls(l.type) === 'l' ? '#c62828' : '#ed6c02';
     const meta = [l.label, l.ev].filter(Boolean).join(' \u00b7 ');
-    const day = dayKey(l.ts);
-    const separator = day !== lastDay
-      ? `<div class="activity-day-separator"><span>${esc(dayLabel(l.ts))}</span></div>`
-      : '';
+    const day = activityDayKey(l.ts);
+    const separator = day !== lastDay ? activityDaySeparator(l.ts) : '';
     lastDay = day;
     return `
     ${separator}

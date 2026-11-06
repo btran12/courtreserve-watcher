@@ -22,6 +22,37 @@
 
   * { box-sizing: border-box; }
 
+  /* ── Motion primitives ── */
+  @keyframes headerDrop {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes riseIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  /* Header and page body settle in on every visit. The header animation deliberately has no
+     fill mode: with a lingering transform it would become the containing block for the fixed
+     nav drawer, which must size to the viewport instead. */
+  header { animation: headerDrop 0.4s cubic-bezier(0.2, 0.7, 0.3, 1); }
+  main   { animation: riseIn 0.42s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+  /* Staggered entrance for the cards/sections rendered after a view or day change.
+     --anim-order is set per element by animateViewContent() in app.js. */
+  .anim-in {
+    animation: riseIn 0.32s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+    animation-delay: calc(var(--anim-order, 0) * 35ms);
+  }
+
+  /* Cross-fade between this page and the DUPR page (Chromium). */
+  @view-transition { navigation: auto; }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.22s;
+    animation-timing-function: ease;
+  }
+
   body {
     font-family: 'Roboto', system-ui, -apple-system, sans-serif;
     margin: 0;
@@ -377,6 +408,7 @@
   .chip-full { background: #ffebee; color: #c62828; font-weight: 700; }
   .chip-latest { background: #fff8e1; color: #b78103; border: 1px solid #ffe082; font-weight: 700; }
   .chip-relative { background: #f3e5f5; color: #7b1fa2; font-weight: 600; }
+  .chip-games { background: #e0f7fa; color: #00695c; font-weight: 600; }
 
   .event-subtitle {
     font-size: 0.8rem;
@@ -413,6 +445,7 @@
     margin-bottom: 8px;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 4px;
   }
 
@@ -1562,11 +1595,11 @@
     will-change: transform;
   }
 
-  /* Slide the incoming day in from the side the user swiped from. */
-  #viewContainer.day-slide-in {
+  /* Slide the incoming view in from the side the user navigated from. */
+  #viewContainer.view-slide-in {
     animation: daySlideFromLeft 0.22s cubic-bezier(0.2, 0.7, 0.3, 1) both;
   }
-  #viewContainer.day-slide-in.from-next {
+  #viewContainer.view-slide-in.from-next {
     animation-name: daySlideFromRight;
   }
   @keyframes daySlideFromLeft {
@@ -1578,7 +1611,8 @@
     to   { opacity: 1; transform: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    #viewContainer.day-slide-in { animation: none; }
+    header, main, .bottom-nav, .anim-in { animation: none; }
+    #viewContainer.view-slide-in { animation: none; }
     .day-view-container { transition: none !important; }
   }
 
@@ -2175,6 +2209,7 @@
         inset 0 -1px 0 rgba(255, 255, 255, 0.1),
         inset 0 0 12px 6px rgba(255, 255, 255, 0.6);
       overflow: hidden;
+      animation: riseIn 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) 0.08s both;
     }
 
     /* Glass edge highlights */

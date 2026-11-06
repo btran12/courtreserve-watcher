@@ -75,6 +75,7 @@ function buildSlots(events, now) {
       wait: ev.WaitListCount || 0,
       capacity: ev.Capacity || ev.MaxMembers || ev.MaxParticipants || ev.TotalSpots || ev.MaxCapacity || null,
       spotsRemaining: ev.SpotsRemaining || ev.AvailableSpots || ev.OpenSpots || ev.SpotsAvailable || null,
+      durationMin: start && end ? Math.round((end - start) / 60000) : null,
     });
   }
   return [...slots.values()].sort((a, b) => a.key.localeCompare(b.key));
@@ -306,6 +307,7 @@ async function main() {
         waitCount: e.wait,
         capacity: (perEventMap[e.name] || {}).capacity != null ? perEventMap[e.name].capacity : e.capacity,
         spotsRemaining: (perEventMap[e.name] || {}).spotsRemaining != null ? perEventMap[e.name].spotsRemaining : e.spotsRemaining,
+        durationMin: e.durationMin || null,
         reg: (perEventMap[e.name] || {}).reg || [],
         wait: (perEventMap[e.name] || {}).wait || [],
       })),
