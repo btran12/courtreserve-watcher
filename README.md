@@ -125,3 +125,9 @@ horizontally on a trackpad, or drag the scrollbar) and spans the dates present i
 padded out to full weeks — tap any day to open it. On phones exactly seven days fill the screen at
 once; on desktop the day cells are wider. The page content itself also moves one day at a time with a
 left/right swipe, a horizontal trackpad gesture, or the ← / → keys. Vertical scrolling is unaffected.
+
+**Device notifications:** when you star an event, the app asks once for notification permission
+(the bell in the header does the same, and toggles alerts off/on afterwards). Every watch-change
+toast for a watched event is mirrored to the device, so it still reaches you with the tab in the
+background or another app open. Tapping the notification opens the app on that event's day, and
+dismissing the toast dismisses its system notification.

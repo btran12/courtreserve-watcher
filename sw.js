@@ -99,3 +99,30 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(respond(request));
 });
+
+// Tapping a watch-change notification focuses the app (or opens it) on that event's day.
+self.addEventListener('notificationclick', (event) => {
+  const notification = event.notification;
+  notification.close();
+
+  const targetUrl = (notification.data && notification.data.url) || self.registration.scope;
+
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const appWindows = windows.filter((client) => client.url.startsWith(self.registration.scope));
+    // Prefer the window the user is already looking at.
+    const existing = appWindows.find((client) => client.focused) || appWindows[0];
+
+    if (existing) {
+      await existing.focus();
+      if ('navigate' in existing && existing.url !== targetUrl) {
+        try { await existing.navigate(targetUrl); } catch (_) { /* keep the focused tab */ }
+      }
+      return;
+    }
+
+    if (self.clients.openWindow) {
+      await self.clients.openWindow(targetUrl);
+    }
+  })());
+});

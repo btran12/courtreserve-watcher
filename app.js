@@ -29,6 +29,15 @@ const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).
 
 const open = new Set();
 let currentData = null;
+
+// ── Device (system) notifications ──
+// Every watch-change toast also raises a matching OS notification when the user allows it,
+// so an alert still arrives with the tab in the background, another app in front, or the
+// installed app on a phone.
+const NOTIFY_PREF_KEY = 'crw_notify_pref';   // 'on' | 'off', null until the user chooses
+const NOTIFY_ASKED_KEY = 'crw_notify_asked'; // stops re-prompting after a dismissed permission dialog
+const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
+let notifyPref = localStorage.getItem(NOTIFY_PREF_KEY);
 let currentView = (() => {
   const saved = localStorage.getItem('crw_view');
   if (saved) return saved;
@@ -57,6 +66,8 @@ function toggleWatch(slotKey) {
     watchedEvents.delete(slotKey);
   } else {
     watchedEvents.add(slotKey);
+    // First watch is a natural, user-initiated moment to offer device alerts.
+    maybeAskForNotifications();
   }
   localStorage.setItem('crw_watched', JSON.stringify([...watchedEvents]));
   renderCurrentView();
@@ -130,11 +141,11 @@ function checkWatchedChanges(data) {
 
     // Spot-opened toast
     if (spots != null && prev.spots != null && prev.spots === 0 && spots > 0) {
-      toasts.push({ type: 'spot-open', title: `${spots} spot${spots > 1 ? 's' : ''} opened!`, when, eventName, summary, changes, key });
+      toasts.push({ type: 'spot-open', title: `${spots} spot${spots > 1 ? 's' : ''} opened!`, when, eventName, summary, changes, key, date: s.date });
     }
     // General change toast (roster changed, including swaps that keep the counts identical)
     else if (changes.length || countsChanged) {
-      toasts.push({ type: 'change', title: 'Roster changed', when, eventName, summary, changes, key });
+      toasts.push({ type: 'change', title: 'Roster changed', when, eventName, summary, changes, key, date: s.date });
     }
   }
 
@@ -158,10 +169,14 @@ function ensureToastContainer() {
 // Toasts are sticky: they stay until the reader dismisses them (or clears them all).
 // A long-lived tab could otherwise pile them up, so the stack is capped.
 const MAX_TOASTS = 6;
+// Monotonic id used to pair each toast with the system notification it raises.
+let toastSeq = 0;
 
 function dismissToast(el) {
   if (!el || el.classList.contains('dismissing')) return;
   el.classList.add('dismissing');
+  // The matching system notification goes away with its toast.
+  closeDeviceNotification(el.dataset.notifTag);
   setTimeout(() => {
     el.remove();
     syncToastContainer();
@@ -198,11 +213,14 @@ function toastChangesHtml(changes) {
   return `<ul class="toast-changes">${items}${extra ? `<li class="toast-more">+${extra} more change${extra > 1 ? 's' : ''}</li>` : ''}</ul>`;
 }
 
-function showToast(t) {
+function showToast(t, opts = {}) {
   // The container is torn down once the last toast is dismissed, so recreate on demand.
   ensureToastContainer();
   const container = document.getElementById('toastContainer');
   if (!container) return;
+
+  // Tags are unique per toast so dismissing one closes exactly its own system notification.
+  const tag = `crw-${++toastSeq}-${t.key || 'update'}`;
 
   if (!container.querySelector('.toast-clear-all')) {
     const bulk = document.createElement('button');
@@ -213,9 +231,14 @@ function showToast(t) {
     container.appendChild(bulk);
   }
 
+  const [toastIcon, toastColor] = t.type === 'spot-open' ? ['event_available', '#2e7d32']
+    : t.type === 'notify' ? ['notifications_active', '#1976d2']
+    : ['campaign', '#1976d2'];
+
   const el = document.createElement('div');
   el.className = `toast ${t.type}`;
-  el.innerHTML = `<span class="toast-icon material-symbols-outlined" style="color:${t.type === 'spot-open' ? '#2e7d32' : '#1976d2'}">${t.type === 'spot-open' ? 'event_available' : 'campaign'}</span>
+  el.dataset.notifTag = tag;
+  el.innerHTML = `<span class="toast-icon material-symbols-outlined" style="color:${toastColor}">${toastIcon}</span>
     <div class="toast-body">
       <div class="toast-title">${esc(t.title)}</div>
       ${t.when ? `<div class="toast-when"><span class="material-symbols-outlined">schedule</span><span>${esc(t.when)}</span></div>` : ''}
@@ -230,9 +253,187 @@ function showToast(t) {
   el.onclick = () => dismissToast(el);
   container.appendChild(el);
 
+  // Mirror the toast to the device. Permission feedback toasts opt out with { device: false }.
+  if (opts.device !== false) notifyDevice(t, tag);
+
   const shown = [...container.querySelectorAll('.toast')];
   if (shown.length > MAX_TOASTS) shown.slice(0, shown.length - MAX_TOASTS).forEach(dismissToast);
   syncToastContainer();
+}
+
+// ── Device notification plumbing ──
+
+function notificationPermission() {
+  if (!notifySupported) return 'unsupported';
+  try { return Notification.permission; } catch (_) { return 'denied'; }
+}
+
+// On by default once permission is granted; the bell button can switch it back off.
+function notifyEnabled() {
+  return notificationPermission() === 'granted' && notifyPref !== 'off';
+}
+
+// "12 registered (+2) · 1 waitlisted" plus who moved, same content as the toast body.
+function deviceNotificationBody(t) {
+  const lines = [];
+  if (t.when) lines.push(t.when);
+  if (t.summary) lines.push(t.summary);
+  const changes = t.changes || [];
+  for (const c of changes.slice(0, MAX_TOAST_CHANGES)) lines.push(`${c.name} ${TEXT[c.type] || c.type}`);
+  const extra = changes.length - Math.min(changes.length, MAX_TOAST_CHANGES);
+  if (extra > 0) lines.push(`+${extra} more change${extra > 1 ? 's' : ''}`);
+  return lines.join('\n');
+}
+
+// Tapping a notification should land on the event's day rather than the app's last view.
+function notificationUrl(t) {
+  if (!t.date) return location.href;
+  const params = new URLSearchParams({ view: 'day', date: t.date });
+  return `${location.origin}${location.pathname}#${params.toString()}`;
+}
+
+async function displayDeviceNotification(title, options) {
+  // The service worker path is required on Android and on iOS home-screen web apps;
+  // a page-level Notification is the desktop fallback when no worker is registered.
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, options);
+        return;
+      }
+    } catch (_) {
+      /* fall through to the constructor */
+    }
+  }
+  try {
+    const n = new Notification(title, options);
+    n.onclick = () => {
+      window.focus();
+      n.close();
+      const target = options.data && options.data.url;
+      if (target && target !== location.href) location.href = target;
+    };
+  } catch (_) {
+    /* notifications unavailable */
+  }
+}
+
+function notifyDevice(t, tag) {
+  if (!notifyEnabled()) return;
+  const title = t.eventName ? `${t.title} — ${t.eventName}` : t.title;
+  displayDeviceNotification(title, {
+    body: deviceNotificationBody(t),
+    icon: 'icon.png',
+    badge: 'icon.png',
+    tag,
+    data: { url: notificationUrl(t) },
+  });
+}
+
+async function closeDeviceNotification(tag) {
+  if (!tag || !('serviceWorker' in navigator)) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg || !reg.getNotifications) return;
+    const notifications = await reg.getNotifications({ tag });
+    notifications.forEach((n) => n.close());
+  } catch (_) {
+    /* the OS notification simply stays around */
+  }
+}
+
+function requestNotificationPermission() {
+  if (!notifySupported || typeof Notification.requestPermission !== 'function') return;
+  localStorage.setItem(NOTIFY_ASKED_KEY, '1');
+  let pending;
+  try {
+    pending = Notification.requestPermission();
+  } catch (_) {
+    syncNotifyButton();
+    return;
+  }
+  Promise.resolve(pending).then((permission) => {
+    notifyPref = permission === 'granted' ? 'on' : permission === 'denied' ? 'off' : notifyPref;
+    if (notifyPref) localStorage.setItem(NOTIFY_PREF_KEY, notifyPref);
+    syncNotifyButton();
+    if (permission === 'granted') {
+      showToast({
+        type: 'notify',
+        title: 'Device notifications on',
+        summary: "Watched-event changes will also pop up on this device.",
+      }, { device: false });
+    } else if (permission === 'denied') {
+      showToast({
+        type: 'notify',
+        title: 'Device notifications blocked',
+        summary: 'Allow notifications for this site in your browser settings to turn them on.',
+      }, { device: false });
+    }
+  }).catch(() => { syncNotifyButton(); });
+}
+
+// Ask once, from a user gesture, the first time an event is watched. Afterwards only the bell
+// button (or the browser's own settings) changes the choice.
+function maybeAskForNotifications() {
+  if (notificationPermission() !== 'default') return;
+  if (localStorage.getItem(NOTIFY_ASKED_KEY)) return;
+  requestNotificationPermission();
+}
+
+function toggleDeviceNotifications() {
+  const permission = notificationPermission();
+  if (permission === 'unsupported') return;
+
+  if (permission === 'denied') {
+    showToast({
+      type: 'notify',
+      title: 'Device notifications blocked',
+      summary: 'Allow notifications for this site in your browser settings, then try again.',
+    }, { device: false });
+    return;
+  }
+
+  if (permission === 'default') {
+    requestNotificationPermission();
+    return;
+  }
+
+  // Already granted: the bell flips the app-level preference without touching site settings.
+  notifyPref = notifyEnabled() ? 'off' : 'on';
+  localStorage.setItem(NOTIFY_PREF_KEY, notifyPref);
+  syncNotifyButton();
+  showToast({
+    type: 'notify',
+    title: notifyPref === 'on' ? 'Device notifications on' : 'Device notifications off',
+    summary: notifyPref === 'on'
+      ? "Watched-event changes will also pop up on this device."
+      : 'You will still see change toasts inside the app.',
+  }, { device: false });
+}
+
+// Reflect permission + preference in the header bell (hidden on browsers without support).
+function syncNotifyButton() {
+  const btn = document.getElementById('notifyToggle');
+  if (!btn) return;
+  if (!notifySupported) { btn.hidden = true; return; }
+  btn.hidden = false;
+
+  const permission = notificationPermission();
+  const on = notifyEnabled();
+  const blocked = permission === 'denied';
+  const icon = btn.querySelector('.material-symbols-outlined');
+
+  btn.classList.toggle('on', on);
+  btn.classList.toggle('blocked', blocked);
+  btn.setAttribute('aria-pressed', String(on));
+  if (icon) icon.textContent = blocked ? 'notifications_off' : on ? 'notifications_active' : 'notifications_none';
+  btn.title = blocked
+    ? 'Device notifications blocked — allow them in your browser settings'
+    : on ? 'Device notifications on — click to turn off'
+    : permission === 'granted' ? 'Device notifications off — click to turn on'
+    : 'Enable device notifications';
+  btn.setAttribute('aria-label', btn.title);
 }
 
 // ── User name ──
@@ -882,6 +1083,18 @@ function restoreFromUrl() {
     selectedDate = new Date(y, m - 1, day);
   }
 }
+
+// A device notification opens a hash on an already-running tab (a same-document navigation,
+// so the page does not reload). Follow the new view/date instead of ignoring it.
+window.addEventListener('hashchange', () => {
+  const prevView = currentView;
+  const prevDate = toDateStr(selectedDate);
+  restoreFromUrl();
+  if (currentView === prevView && toDateStr(selectedDate) === prevDate) return;
+  pendingViewAnim = 'enter';
+  closeCourtsModal();
+  renderCurrentView();
+});
 
 function renderCurrentView() {
   if (!currentData) return;
@@ -1771,8 +1984,13 @@ document.getElementById('app').addEventListener('toggle', (e) => {
   e.target.open ? open.add(k) : open.delete(k);
 }, true);
 
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') load(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  syncNotifyButton(); // the user may have changed the site permission outside the app
+  load();
+});
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && courtsModalDate) closeCourtsModal(); });
 setInterval(load, 60000);
+syncNotifyButton();
 load();
 showNamePrompt();

@@ -157,6 +157,17 @@
     font-size: 18px;
   }
 
+  /* ── Device notification toggle ── */
+  .notify-btn[hidden] { display: none; }
+  .notify-btn.on {
+    color: var(--md-primary-variant);
+    background: rgba(25, 118, 210, 0.14);
+    border-color: rgba(25, 118, 210, 0.35);
+  }
+  .notify-btn.on:hover { background: rgba(25, 118, 210, 0.22); }
+  .notify-btn.on .material-symbols-outlined { color: var(--md-primary-variant); }
+  .notify-btn.blocked .material-symbols-outlined { color: #c62828; }
+
   /* ── Header page menu: left drawer ── */
   .nav-menu {
     position: relative;
@@ -1778,6 +1789,7 @@
   .toast .toast-changes .toast-more { color: var(--md-on-surface-variant); font-style: italic; }
   .toast.spot-open { border-left: 4px solid #2e7d32; }
   .toast.change { border-left: 4px solid #1976d2; }
+  .toast.notify { border-left: 4px solid #1976d2; }
 
   /* Toasts never auto-dismiss, so each one carries an explicit close button */
   .toast .toast-close {
