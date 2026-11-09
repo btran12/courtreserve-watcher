@@ -130,4 +130,5 @@ left/right swipe, a horizontal trackpad gesture, or the ← / → keys. Vertical
 (the bell in the header does the same, and toggles alerts off/on afterwards). Every watch-change
 toast for a watched event is mirrored to the device, so it still reaches you with the tab in the
 background or another app open. Tapping the notification opens the app on that event's day, and
-dismissing the toast dismisses its system notification.
+dismissing the toast dismisses its system notification. Toasts can be dismissed with their close
+button, by tapping them, or with a left/right swipe.

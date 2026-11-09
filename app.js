@@ -172,15 +172,101 @@ const MAX_TOASTS = 6;
 // Monotonic id used to pair each toast with the system notification it raises.
 let toastSeq = 0;
 
-function dismissToast(el) {
+// Horizontal swipe-to-dismiss: how far / how fast the toast must travel before it flies out.
+const TOAST_SWIPE_MIN = 48;      // px
+const TOAST_SWIPE_VELOCITY = 0.5; // px per ms
+const TOAST_SWIPE_MAX_RATIO = 0.25; // of the toast width, capped below
+
+function dismissToast(el, direction) {
   if (!el || el.classList.contains('dismissing')) return;
   el.classList.add('dismissing');
+  if (direction) el.classList.add(direction === 'left' ? 'swipe-left' : 'swipe-right');
   // The matching system notification goes away with its toast.
   closeDeviceNotification(el.dataset.notifTag);
   setTimeout(() => {
     el.remove();
     syncToastContainer();
   }, 250);
+}
+
+// Drag a toast sideways to throw it away. A short drag springs back instead.
+// Vertical gestures are left to the page so scrolling still works on touch.
+function attachToastSwipe(el, onHorizontalDrag) {
+  let drag = null;
+
+  const snapBack = () => {
+    drag = null;
+    if (!el.isConnected) return;
+    el.classList.remove('swiping');
+    void el.offsetWidth; // commit the drag offset before the transition is enabled
+    el.classList.add('snapping');
+    el.style.transform = '';
+    el.style.opacity = '';
+    setTimeout(() => el.classList.remove('snapping'), 220);
+  };
+
+  el.addEventListener('pointerdown', (event) => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    // A previous gesture's click may not have fired (e.g. pointercancel); reset safely here.
+    drag = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      time: performance.now(),
+      axis: null,
+    };
+  });
+
+  el.addEventListener('pointermove', (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+
+    if (!drag.axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      // Dominant vertical movement means the user is scrolling, not swiping the toast.
+      if (Math.abs(dy) >= Math.abs(dx)) { drag.axis = 'y'; return; }
+      drag.axis = 'x';
+      try { el.setPointerCapture(event.pointerId); } catch (_) { /* not supported */ }
+      el.classList.remove('snapping');
+      el.classList.add('swiping');
+      onHorizontalDrag();
+    }
+    if (drag.axis !== 'x') return;
+
+    event.preventDefault();
+    const opacity = Math.max(0.3, 1 - Math.abs(dx) / (el.offsetWidth || 320));
+    el.style.setProperty('--toast-swipe-x', `${dx}px`);
+    el.style.setProperty('--toast-swipe-opacity', String(opacity));
+    el.style.transform = `translateX(${dx}px)`;
+    el.style.opacity = String(opacity);
+  });
+
+  const endDrag = (event) => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const gesture = drag;
+    drag = null;
+    if (gesture.axis !== 'x') return;
+
+    const dx = event.clientX - gesture.x;
+    const elapsed = Math.max(1, performance.now() - gesture.time);
+    const threshold = Math.min(96, Math.max(TOAST_SWIPE_MIN, el.offsetWidth * TOAST_SWIPE_MAX_RATIO));
+    const fast = Math.abs(dx) / elapsed > TOAST_SWIPE_VELOCITY && Math.abs(dx) > 28;
+
+    if (Math.abs(dx) >= threshold || fast) {
+      el.classList.remove('swiping', 'snapping');
+      dismissToast(el, dx >= 0 ? 'right' : 'left');
+    } else {
+      snapBack();
+    }
+  };
+
+  el.addEventListener('pointerup', endDrag);
+  el.addEventListener('pointercancel', () => {
+    // Only a horizontal gesture has anything to spring back; a canceled page scroll does not.
+    if (drag && drag.axis === 'x') snapBack();
+    else drag = null;
+  });
 }
 
 function clearToasts() {
@@ -250,8 +336,14 @@ function showToast(t, opts = {}) {
       <span class="material-symbols-outlined">close</span>
     </button>`;
   el.querySelector('.toast-close').onclick = (e) => { e.stopPropagation(); dismissToast(el); };
-  el.onclick = () => dismissToast(el);
+  // A horizontal drag must not also fire the tap-to-dismiss click when it ends.
+  let clickBlockedUntil = 0;
+  el.onclick = () => {
+    if (performance.now() < clickBlockedUntil) return;
+    dismissToast(el);
+  };
   container.appendChild(el);
+  attachToastSwipe(el, () => { clickBlockedUntil = performance.now() + 500; });
 
   // Mirror the toast to the device. Permission feedback toasts opt out with { device: false }.
   if (opts.device !== false) notifyDevice(t, tag);
