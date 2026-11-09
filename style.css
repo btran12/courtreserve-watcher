@@ -45,6 +45,17 @@
     animation-delay: calc(var(--anim-order, 0) * 35ms);
   }
 
+  /* Roster names cascade in on first load. --name-order is set per list item
+     by animateRosterNames() in app.js, restarting for each event's list. */
+  @keyframes nameRise {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+  .name-in {
+    animation: nameRise 0.28s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+    animation-delay: calc(var(--name-order, 0) * 28ms);
+  }
+
   /* Cross-fade between this page and the DUPR page (Chromium). */
   @view-transition { navigation: auto; }
   ::view-transition-old(root),
@@ -1611,7 +1622,7 @@
     to   { opacity: 1; transform: none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    header, main, .bottom-nav, .anim-in { animation: none; }
+    header, main, .bottom-nav, .anim-in, .name-in { animation: none; }
     #viewContainer.view-slide-in { animation: none; }
     .day-view-container { transition: none !important; }
   }
@@ -1924,6 +1935,8 @@
     -webkit-tap-highlight-color: transparent;
     transition: border-color 0.15s, box-shadow 0.15s;
   }
+  /* Inline in a day card (after the waitlist) needs the same gap as Event Activity. */
+  .day-slot-body .courts-panel { margin-top: 12px; }
   .courts-panel:hover { border-color: #a5d6a7; box-shadow: var(--shadow-2); }
   .courts-panel:focus-visible { outline: 2px solid var(--md-primary); outline-offset: 2px; }
   .courts-more {

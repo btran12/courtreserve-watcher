@@ -39,6 +39,9 @@ let dateInitialized = false;
 // One-shot animation for the next renderCurrentView(): 'enter' after a view switch or first visit,
 // 'prev'/'next' for directional navigation, null for background data refreshes (leave it still).
 let pendingViewAnim = 'enter';
+// Roster names stagger in once, on the first paint after the data arrives. Later renders
+// (background polls, view changes) leave the lists still.
+let namesAnimated = false;
 // Date the day ribbon was last scrolled for, so a data refresh keeps the user's scroll position.
 let ribbonCenteredFor = null;
 
@@ -967,6 +970,12 @@ function renderCurrentView() {
     animateViewContent(viewContainer);
   }
 
+  // First paint only: make the names appear one after another within each event list.
+  // Wait for a render that actually has rosters so an empty day doesn't use up the effect.
+  if (!namesAnimated && viewContainer && animateRosterNames(viewContainer)) {
+    namesAnimated = true;
+  }
+
   if (currentView === 'day') {
     const ribbon = document.querySelector('#viewContainer .day-ribbon');
     const activeDayBtn = ribbon ? ribbon.querySelector('.day-ribbon-btn.active') : null;
@@ -1009,6 +1018,26 @@ function animateViewContent(container) {
       el.style.removeProperty('--anim-order');
     }, { once: true });
   });
+}
+
+// Reveal roster names one by one, restarting the stagger for each list so every
+// event's registered/waitlist names cascade independently on the first page paint.
+function animateRosterNames(container) {
+  if (!container || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0;
+  let animated = 0;
+  container.querySelectorAll('ol.people-list, ol.cal-roster-list').forEach((list) => {
+    [...list.children].forEach((li, i) => {
+      if (li.classList.contains('open-slot')) return; // blank spot placeholders are not names
+      animated++;
+      li.style.setProperty('--name-order', String(Math.min(i, 24)));
+      li.classList.add('name-in');
+      li.addEventListener('animationend', () => {
+        li.classList.remove('name-in');
+        li.style.removeProperty('--name-order');
+      }, { once: true });
+    });
+  });
+  return animated;
 }
 
 function renderWeekView(d) {
@@ -1185,6 +1214,13 @@ function renderDayView(d) {
   const slotDateLabel = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
   const relLabel = getRelativeDateLabel(selectedDateStr);
 
+  // The Open Courts panel normally leads the day. For events with a full roster
+  // (10+ registered) it is more useful right after the waitlist, just before the
+  // activity log, so it moves into the first such event card.
+  const COURTS_INLINE_MIN_REG = 10;
+  const courtsDayHtml = renderCourtsDay(d, selectedDateStr);
+  const courtsSlotIdx = daySlots.findIndex((s) => count(s, 'reg') >= COURTS_INLINE_MIN_REG);
+
   let slotsHtml = '';
   if (!daySlots.length) {
     slotsHtml = `
@@ -1196,7 +1232,8 @@ function renderDayView(d) {
       </div>
     `;
   } else {
-    slotsHtml = daySlots.map((s) => {
+    slotsHtml = daySlots.map((s, slotIdx) => {
+      const courtsHere = slotIdx === courtsSlotIdx ? courtsDayHtml : '';
       const regNames = Object.entries(s.people)
         .filter(([, p]) => p.status === 'reg')
         .map(([n]) => n)
@@ -1288,7 +1325,7 @@ function renderDayView(d) {
           </div>
           <div class="day-slot-body">
             ${hasPerEventData(s)
-              ? '<div class="event-grid event-grid-stacked" style="margin-top:0;">' + renderPerEventSections(s) + '</div>'
+              ? '<div class="event-grid event-grid-stacked" style="margin-top:0;">' + renderPerEventSections(s) + '</div>' + courtsHere
               : `<div class="event-grid event-grid-stacked" style="margin-top:0;">
               <div class="box-container">
                 <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${regNames.length})</div>
@@ -1298,7 +1335,8 @@ function renderDayView(d) {
                 <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${waitNames.length})</div>
                 ${waitRosterHtml}
               </div>
-            </div>`
+            </div>
+            ${courtsHere}`
             }
             <div class="box-container" style="margin-top:12px;">
               <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
@@ -1315,7 +1353,7 @@ function renderDayView(d) {
       <div class="day-ribbon">
         ${ribbonHtml}
       </div>
-      ${renderCourtsDay(d, selectedDateStr)}
+      ${courtsSlotIdx === -1 ? courtsDayHtml : ''}
       ${slotsHtml}
     </div>
   `;
