@@ -27,7 +27,6 @@ const fmtTime = (t) => { const [h, m] = t.split(':').map(Number); return `${((h 
 const renderIcon = (type) => `<span class="material-symbols-outlined" style="font-size:16px; vertical-align:middle;">${ICON[type] || 'info'}</span>`;
 const count = (s, st) => Object.values(s.people).filter((p) => p.status === st).length;
 
-const open = new Set();
 let currentData = null;
 
 // ── Device (system) notifications ──
@@ -38,11 +37,8 @@ const NOTIFY_PREF_KEY = 'crw_notify_pref';   // 'on' | 'off', null until the use
 const NOTIFY_ASKED_KEY = 'crw_notify_asked'; // stops re-prompting after a dismissed permission dialog
 const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
 let notifyPref = localStorage.getItem(NOTIFY_PREF_KEY);
-let currentView = (() => {
-  const saved = localStorage.getItem('crw_view');
-  if (saved) return saved;
-  return window.innerWidth < 768 ? 'day' : 'week';
-})();
+// Only two pages remain: the day view (with the court timeline) and the activity feed.
+let currentView = localStorage.getItem('crw_view') === 'activity' ? 'activity' : 'day';
 let selectedDate = new Date();
 let dateInitialized = false;
 // One-shot animation for the next renderCurrentView(): 'enter' after a view switch or first visit,
@@ -720,7 +716,6 @@ function eventUrl(keyOrNumber) {
 // ── Open court availability (state.courts, produced by the Lambda) ──
 const COURTS_URL = 'https://app.courtreserve.com/Online/Reservations/Bookings/17397?sId=22028';
 const toMinutes = (t) => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
-const fromMinutes = (n) => `${String(Math.floor(n / 60)).padStart(2, '0')}:${String(n % 60).padStart(2, '0')}`;
 const fmtRange = (s, e) => `${fmtTime(s)}–${fmtTime(e)}`;
 const shortCourtName = (name) => name.replace(/^pickleball\s+/i, '');
 
@@ -729,22 +724,7 @@ function courtDay(d, dateStr) {
   return day && day.free ? day : null;
 }
 
-// Windows where at least one court is free, with how many courts are free in each.
-function mergedCourtWindows(free) {
-  const lists = Object.values(free);
-  const points = [...new Set(lists.flat().flat().map(toMinutes))].sort((a, b) => a - b);
-  const out = [];
-  for (let i = 0; i < points.length - 1; i++) {
-    const [s, e] = [points[i], points[i + 1]];
-    const n = lists.filter((w) => w.some(([fs, fe]) => toMinutes(fs) <= s && toMinutes(fe) >= e)).length;
-    const last = out[out.length - 1];
-    if (!n) continue;
-    if (last && last.n === n && last.e === s) last.e = e;
-    else out.push({ s, e, n });
-  }
-  return out.map((w) => ({ start: fromMinutes(w.s), end: fromMinutes(w.e), courts: w.n }));
-}
-
+// Windows either way: tapping a court in the day panel opens the timeline.
 function renderCourtsDay(d, dateStr) {
   const day = courtDay(d, dateStr);
   if (!day) return '';
@@ -782,25 +762,7 @@ function renderCourtsDay(d, dateStr) {
     </div>`;
 }
 
-function renderCourtsWeekCol(d, dateStr) {
-  const day = courtDay(d, dateStr);
-  if (!day) return '';
-  const windows = mergedCourtWindows(day.free);
-  return `
-    <div class="cal-roster-section">
-      <div class="cal-roster-title">
-        <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">sports_tennis</span> Open courts</span>
-      </div>
-      ${windows.length
-        ? `<ul class="court-week-list">${windows.map((w) => `<li>${fmtRange(w.start, w.end)} <span class="court-count">${w.courts} ${w.courts === 1 ? 'court' : 'courts'}</span></li>`).join('')}</ul>`
-        : '<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">Fully booked</div>'}
-    </div>`;
-}
-
 // ── Court availability timeline modal ──
-// The panel above only lists free windows as chips; tapping it opens a scrollable
-// column-per-court timeline (like the CourtReserve scheduler) so booked vs. open
-// stretches are obvious at a glance.
 const COURT_PX_PER_MIN = 1.15;
 let courtsModalDate = null;
 
@@ -1105,9 +1067,6 @@ function copyPersonId(id) {
 }
 
 // ── Event data helpers (events are now {name, number} objects) ──
-function eventNames(snapshot) {
-  return (snapshot.events || []).map(e => typeof e === 'string' ? e : e.name);
-}
 function eventLinks(snapshot) {
   return (snapshot.events || []).map(e => {
     if (typeof e === 'string') return esc(e);
@@ -1202,18 +1161,6 @@ function getWeekDays(date) {
   return days;
 }
 
-function formatWeekRange(weekDays) {
-  const start = weekDays[0];
-  const end = weekDays[6];
-  if (start.getFullYear() === end.getFullYear()) {
-    if (start.getMonth() === end.getMonth()) {
-      return `${start.toLocaleDateString(undefined, { month: 'short' })} ${start.getDate()} – ${end.getDate()}, ${start.getFullYear()}`;
-    }
-    return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}, ${end.getFullYear()}`;
-  }
-  return `${start.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} – ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
-}
-
 function getRelativeDateLabel(dateStr) {
   const now = new Date();
   const [y, m, d] = dateStr.split('-').map(Number);
@@ -1276,14 +1223,14 @@ function initDateIfNeeded(data) {
 }
 
 function setView(view) {
-  currentView = view;
-  localStorage.setItem('crw_view', view);
+  currentView = view === 'activity' ? 'activity' : 'day';
+  localStorage.setItem('crw_view', currentView);
   closeCourtsModal();
   pendingViewAnim = 'enter';
   syncUrl();
   renderCurrentView();
   // Attach swipe handlers when entering day view
-  if (view === 'day') setTimeout(attachSwipeHandlers, 100);
+  if (currentView === 'day') setTimeout(attachSwipeHandlers, 100);
 }
 
 function navToday() {
@@ -1294,14 +1241,14 @@ function navToday() {
 }
 
 function navPrev() {
-  selectedDate.setDate(selectedDate.getDate() - (currentView === 'day' ? 1 : 7));
+  selectedDate.setDate(selectedDate.getDate() - 1);
   pendingViewAnim = 'prev';
   syncUrl();
   renderCurrentView();
 }
 
 function navNext() {
-  selectedDate.setDate(selectedDate.getDate() + (currentView === 'day' ? 1 : 7));
+  selectedDate.setDate(selectedDate.getDate() + 1);
   pendingViewAnim = 'next';
   syncUrl();
   renderCurrentView();
@@ -1335,13 +1282,15 @@ function restoreFromUrl() {
   const params = new URLSearchParams(hash);
   const v = params.get('view');
   const d = params.get('date');
-  if (v && ['week','day','list','activity'].includes(v)) {
-    currentView = v;
-  }
+  const legacyView = !!v && v !== 'day' && v !== 'activity';
+  if (v === 'day' || v === 'activity') currentView = v;
+  else if (v) currentView = 'day'; // links saved with the old week/list views open the day view
   if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
     const [y, m, day] = d.split('-').map(Number);
     selectedDate = new Date(y, m - 1, day);
   }
+  // Rewrite an old week/list link so the address bar matches what is on screen.
+  if (legacyView) syncUrl();
 }
 
 // A device notification opens a hash on an already-running tab (a same-document navigation,
@@ -1360,28 +1309,13 @@ function renderCurrentView() {
   if (!currentData) return;
   const app = document.getElementById('app');
 
-  let titleStr = '';
-  const weekDays = getWeekDays(selectedDate);
-  if (currentView === 'week') {
-    titleStr = formatWeekRange(weekDays);
-  } else if (currentView === 'day') {
-    titleStr = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  } else if (currentView === 'activity') {
-    titleStr = 'All Activity';
-  } else {
-    titleStr = 'All Tracked Events';
-  }
+  const titleStr = currentView === 'activity'
+    ? 'All Activity'
+    : selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-  let viewHtml = '';
-  if (currentView === 'week') {
-    viewHtml = renderWeekView(currentData);
-  } else if (currentView === 'day') {
-    viewHtml = renderDayView(currentData);
-  } else if (currentView === 'activity') {
-    viewHtml = renderActivityView(currentData);
-  } else {
-    viewHtml = renderListView(currentData);
-  }
+  const viewHtml = currentView === 'activity'
+    ? renderActivityView(currentData)
+    : renderDayView(currentData);
 
   // Keep the day ribbon where the user left it when the same day is re-rendered (e.g. data refresh).
   const prevRibbon = currentView === 'day' ? document.querySelector('#viewContainer .day-ribbon') : null;
@@ -1394,17 +1328,9 @@ function renderCurrentView() {
   app.innerHTML = `
     <div class="nav-toolbar">
       <div class="view-segmented-btn">
-        <button id="seg-week" class="seg-btn ${currentView === 'week' ? 'active' : ''}" onclick="setView('week')">
-          <span class="material-symbols-outlined" style="font-size:18px;">calendar_view_week</span>
-          <span class="seg-label">Week</span>
-        </button>
         <button id="seg-day" class="seg-btn ${currentView === 'day' ? 'active' : ''}" onclick="setView('day')">
           <span class="material-symbols-outlined" style="font-size:18px;">calendar_view_day</span>
           <span class="seg-label">Day</span>
-        </button>
-        <button id="seg-list" class="seg-btn ${currentView === 'list' ? 'active' : ''}" onclick="setView('list')">
-          <span class="material-symbols-outlined" style="font-size:18px;">format_list_bulleted</span>
-          <span class="seg-label">List</span>
         </button>
         <button id="seg-activity" class="seg-btn ${currentView === 'activity' ? 'active' : ''}" onclick="setView('activity')">
           <span class="material-symbols-outlined" style="font-size:18px;">history</span>
@@ -1412,7 +1338,7 @@ function renderCurrentView() {
         </button>
       </div>
 
-      <div class="date-nav-controls" id="dateNavControls" style="${currentView === 'list' || currentView === 'activity' ? 'display:none;' : ''}">
+      <div class="date-nav-controls" id="dateNavControls" style="${currentView === 'activity' ? 'display:none;' : ''}">
         <button class="nav-btn nav-btn-icon" onclick="navPrev()" title="Previous period" aria-label="Previous period">
           <span class="material-symbols-outlined" style="font-size:20px;">chevron_left</span>
         </button>
@@ -1498,7 +1424,7 @@ function animateViewContent(container) {
 function animateRosterNames(container) {
   if (!container || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 0;
   let animated = 0;
-  container.querySelectorAll('ol.people-list, ol.cal-roster-list').forEach((list) => {
+  container.querySelectorAll('ol.people-list').forEach((list) => {
     [...list.children].forEach((li, i) => {
       if (li.classList.contains('open-slot')) return; // blank spot placeholders are not names
       animated++;
@@ -1511,126 +1437,6 @@ function animateRosterNames(container) {
     });
   });
   return animated;
-}
-
-function renderWeekView(d) {
-  const weekDays = getWeekDays(selectedDate);
-  const todayStr = toDateStr(new Date());
-
-  const slotsByDate = {};
-  for (const s of Object.values(d.snapshots)) {
-    if (!slotsByDate[s.date]) slotsByDate[s.date] = [];
-    slotsByDate[s.date].push(s);
-  }
-
-  const log = (d.log || []).filter((l) => l.type !== 'tracking');
-  const last = {};
-  log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
-  const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
-
-  const colsHtml = weekDays.map((day) => {
-    const dateStr = toDateStr(day);
-    const isToday = dateStr === todayStr;
-    const daySlots = (slotsByDate[dateStr] || []).sort((a, b) => a.time.localeCompare(b.time));
-    const dayName = day.toLocaleDateString(undefined, { weekday: 'short' });
-    const dayNum = day.getDate();
-
-    let contentHtml = '';
-    if (!daySlots.length) {
-      contentHtml = `<div class="cal-empty-col">No events</div>`;
-    } else {
-      contentHtml = daySlots.map((s) => {
-        const isLatest = s.key === latest;
-        const regNames = Object.entries(s.people)
-          .filter(([, p]) => p.status === 'reg')
-          .map(([n]) => n)
-          .sort((a, b) => a.localeCompare(b));
-        const waitNames = Object.entries(s.people)
-          .filter(([, p]) => p.status === 'wait')
-          .map(([n]) => n)
-          .sort((a, b) => a.localeCompare(b));
-
-        let weekCap = null, weekRem = null;
-        if (s.events) for (const e of s.events) {
-          if (e.capacity != null) weekCap = (weekCap || 0) + e.capacity;
-          if (e.spotsRemaining != null) weekRem = (weekRem || 0) + e.spotsRemaining;
-        }
-        const openSpots = weekRem != null ? weekRem
-          : weekCap != null ? Math.max(0, weekCap - regNames.length) : null;
-        const regEntries = withOpenSlots(regNames, openSpots);
-
-        const wStatus = userStatus(s);
-        const regOpen = regCountdown(s).open;
-
-        return `
-          <div class="cal-event-card ${isLatest ? 'latest-card' : ''}">
-            <div class="cal-event-header">
-              <div class="cal-event-time-row">
-                <span class="cal-event-time">
-                  <span class="material-symbols-outlined" style="font-size:16px;">schedule</span>
-                  ${fmtTime(s.time)}
-                </span>
-                ${wStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
-                  : wStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
-                  : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none;border-radius:6px;" title="Register on CourtReserve"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-                  : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${regCountdown(s).label}</span>`}
-                <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button>
-                ${isLatest ? `<span class="cal-badge cal-badge-latest"><span class="material-symbols-outlined" style="font-size:12px">update</span> New</span>` : ''}
-              </div>
-              <div class="cal-event-title">${eventLinks(s)}</div>
-              <div class="cal-badges-row">
-                <span class="cal-badge cal-badge-reg"><span class="material-symbols-outlined" style="font-size:12px">group</span> ${regNames.length} reg</span>
-                <span class="cal-badge cal-badge-wait"><span class="material-symbols-outlined" style="font-size:12px">hourglass_empty</span> ${waitNames.length} wait</span>
-                ${openSpots != null ? (openSpots === 0 ? `<span class="cal-badge cal-badge-full"><span class="material-symbols-outlined" style="font-size:12px">block</span> Full</span>` : `<span class="cal-badge cal-badge-open"><span class="material-symbols-outlined" style="font-size:12px">event_available</span> ${openSpots} open</span>`) : ''}
-                ${slotGamesChipHtml(s)}
-              </div>
-            </div>
-
-            <!-- Participant & Waitlist Roster Preview -->
-            <div class="cal-roster-section">
-              <div class="cal-roster-title">
-                <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">group</span> Registered (${regNames.length})</span>
-              </div>
-              ${regEntries.length 
-                ? `<ol class="cal-roster-list">${regEntries.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n, s)}</li>`).join('')}</ol>`
-                : `<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">None</div>`
-              }
-
-              ${waitNames.length ? `
-                <div class="cal-roster-title" style="margin-top:8px;">
-                  <span><span class="material-symbols-outlined" style="font-size:13px; color:#ed6c02; vertical-align:middle;">hourglass_empty</span> Waitlist (${waitNames.length})</span>
-                </div>
-                <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n, s)}</li>`).join('')}</ol>
-              ` : ''}
-            </div>
-</div>
-        `;
-      }).join('');
-    }
-
-    return `
-      <div class="week-day-col ${isToday ? 'is-today' : ''}">
-        <div class="week-col-header" onclick="selectDay('${dateStr}')" title="Click to view full day details">
-          <span class="week-day-name">${dayName}</span>
-          <span class="week-day-num">${dayNum}</span>
-          ${isToday ? `<span class="chip chip-reg" style="font-size:0.65rem; padding:1px 6px;">Today</span>` : ''}
-          ${daySlots.length ? `<span class="week-col-badge">${daySlots.length} ${daySlots.length === 1 ? 'event' : 'events'}</span>` : ''}
-        </div>
-        <div class="week-col-content">
-          ${contentHtml}
-          ${renderCourtsWeekCol(d, dateStr)}
-        </div>
-      </div>
-    `;
-  }).join('');
-
-  return `
-    <div class="calendar-week-container">
-      <div class="calendar-week-grid">
-        ${colsHtml}
-      </div>
-    </div>
-  `;
 }
 
 function renderDayView(d) {
@@ -1829,153 +1635,6 @@ function renderDayView(d) {
       ${courtsSlotIdx === -1 ? courtsDayHtml : ''}
       ${slotsHtml}
     </div>
-  `;
-}
-
-function renderListView(d) {
-  const log = (d.log || []).filter((l) => l.type !== 'tracking');
-  const last = {};
-  log.forEach((l) => { if (!(l.slot in last)) last[l.slot] = l.ts; });
-  const latest = Object.keys(last).filter((k) => d.snapshots[k]).sort((a, b) => last[b] - last[a])[0];
-
-  const renderRegRoster = (s, openSpots) => {
-    const names = Object.entries(s.people)
-      .filter(([, p]) => p.status === 'reg')
-      .map(([n]) => n)
-      .sort((a, b) => a.localeCompare(b));
-    const entries = withOpenSlots(names, openSpots);
-    if (!entries.length) return '<div class="empty-state">None</div>';
-    const half = Math.ceil(entries.length / 2);
-    const col1 = entries.slice(0, half);
-    const col2 = entries.slice(half);
-    const makeList = (items, startIdx) =>
-      `<ol class="people-list" start="${startIdx}">` +
-      items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n, s)}</li>`).join('') +
-      `</ol>`;
-    return `<div class="roster-2col"><div>${makeList(col1, 1)}</div><div>${col2.length ? makeList(col2, half + 1) : ''}</div></div>`;
-  };
-
-  const renderWaitlist = (s) => {
-    const names = Object.entries(s.people)
-      .filter(([, p]) => p.status === 'wait')
-      .map(([n]) => n)
-      .sort((a, b) => a.localeCompare(b));
-    if (!names.length) return '<div class="empty-state">None</div>';
-    return `<ol class="people-list">` + names.map((n) => `<li>${highlightNameWaitlist(n, s)}</li>`).join('') + `</ol>`;
-  };
-
-  const sortedSlots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key));
-
-  let lastDate = '';
-  const slotsHtml = sortedSlots.map((s) => {
-    const showDateHeader = s.date !== lastDate;
-    lastDate = s.date;
-    const relLabel = getRelativeDateLabel(s.date);
-    const uStatus = userStatus(s);
-    const userBadgeHtml = userStatusBadgeHtml(uStatus);
-    const regOpen = regCountdown(s).open;
-
-    let listCap = null, listRem = null;
-    if (s.events) for (const e of s.events) {
-      if (e.capacity != null) listCap = (listCap || 0) + e.capacity;
-      if (e.spotsRemaining != null) listRem = (listRem || 0) + e.spotsRemaining;
-    }
-    const listOpenSpots = listRem != null ? listRem
-      : listCap != null ? Math.max(0, listCap - count(s, 'reg')) : null;
-
-    const ch = log.filter((l) => l.slot === s.key).slice(0, 50).map((l) =>
-      `<div class="row">
-        <div class="row-main">
-          <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
-          <b>${esc(l.name)}</b>
-        </div>
-        <div class="time">${new Date(l.ts).toLocaleString()}</div>
-      </div>`).join('') || '<div class="empty-state" style="padding:8px 0;">No changes yet</div>';
-
-    const cardHtml = `<details class="card ${s.key === latest ? 'latest' : ''}" data-key="${esc(s.key)}" ${open.has(s.key) || s.key === latest ? 'open' : ''}>
-      <summary>
-        <div class="summary-header">
-          <span class="summary-title">
-            <span class="material-symbols-outlined" style="color:var(--md-primary)">schedule</span>
-            ${fmtTime(s.time)}
-          ${uStatus === 'reg' ? `<span class="user-status-badge registered" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">check_circle</span> You're in</span>`
-            : uStatus === 'wait' ? `<span class="user-status-badge waitlisted" style="margin:0;font-size:0.68rem;padding:2px 6px;"><span class="material-symbols-outlined" style="font-size:12px;">hourglass_empty</span> Waitlisted</span>`
-            : regOpen ? `<a href="${eventUrl(firstEventNumber(s))}" target="_blank" rel="noopener" class="header-btn" style="padding:3px 8px; font-size:0.72rem; text-decoration:none; margin-left:6px;border-radius:6px;" title="Register on CourtReserve" onclick="event.stopPropagation();"><span class="material-symbols-outlined" style="font-size:14px;">how_to_reg</span> Register</a>`
-            : `<span class="chip chip-countdown" style="font-size:0.68rem;cursor:default;"><span class="material-symbols-outlined" style="font-size:12px;">lock_clock</span> ${regCountdown(s).label}</span>`}
-          <button class="watch-btn${watchedEvents.has(s.key) ? ' watching' : ''}" onclick="event.preventDefault();event.stopPropagation();toggleWatch('${esc(s.key)}')" title="Watch for changes"><span class="material-symbols-outlined">star</span></button></span>
-          <span class="material-symbols-outlined expand-icon">expand_more</span>
-        </div>
-        <div class="badges-row">
-          <span class="chip chip-relative"><span class="material-symbols-outlined" style="font-size:13px">event</span> ${relLabel}</span>
-          <span class="chip chip-reg">${count(s, 'reg')} out of ${listCap || '?'} registered</span>
-          <span class="chip chip-wait">${count(s, 'wait')} waitlist</span>
-          ${listOpenSpots != null ? (listOpenSpots === 0 ? `<span class="chip chip-full"><span class="material-symbols-outlined" style="font-size:13px">block</span>Event FULL</span>` : `<span class="chip chip-open"><span class="material-symbols-outlined" style="font-size:13px">event_available</span> ${listOpenSpots} spots open</span>`) : ''}
-          ${slotGamesChipHtml(s)}
-          ${s.key === latest ? `<span class="chip chip-latest"><span class="material-symbols-outlined" style="font-size:14px">update</span> Last updated ${new Date(last[s.key]).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>` : ''}
-          
-        </div>
-        <div class="event-subtitle">${eventLinks(s)}</div>
-      </summary>
-      <div class="card-body">
-        ${hasPerEventData(s)
-          ? renderPerEventSections(s) + `
-          <!-- Activity Per Event -->
-          <div class="box-container">
-            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
-            ${ch}
-          </div>`
-          : `<div class="event-grid event-grid-stacked">
-          <!-- Registered Roster -->
-          <div class="box-container">
-            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#2e7d32">group</span> Registered (${count(s, 'reg')})</div>
-            ${renderRegRoster(s, listOpenSpots)}
-          </div>
-
-          <!-- Waitlist -->
-          <div class="box-container">
-            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#ed6c02">hourglass_empty</span> Waitlist (${count(s, 'wait')})</div>
-            ${renderWaitlist(s)}
-          </div>
-
-          <!-- Activity Per Event -->
-          <div class="box-container">
-            <div class="box-title"><span class="material-symbols-outlined" style="font-size:16px; color:#1976d2">history</span> Event Activity</div>
-            ${ch}
-          </div></div>`
-        }
-      </div>
-    </details>`;
-
-    if (showDateHeader) {
-      const formattedDate = new Date(`${s.date}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' });
-      return `
-        <div class="date-group-header">
-          <span class="material-symbols-outlined" style="font-size:16px">calendar_month</span>
-          ${formattedDate} (${relLabel})
-        </div>
-        ${cardHtml}
-      `;
-    }
-    return cardHtml;
-  }).join('') || '<div class="card" style="padding:16px;">No tracked events found.</div>';
-
-  const full = log.slice(0, 300).map((l) => {
-    const when = new Date(l.ts).toLocaleString();
-    const meta = [when, l.label, l.ev].filter(Boolean).join(' \u00b7 ');
-    return `<div class="row">
-      <div class="row-main">
-        <span class="action-chip ${cls(l.type)}">${renderIcon(l.type)} ${esc(TEXT[l.type] || l.type)}</span>
-        <b>${esc(l.name)}</b>
-      </div>
-      <div class="time" title="${esc(meta)}">${esc(meta)}</div>
-    </div>`;
-  }).join('') || '<div class="empty-state" style="padding:8px 0;">No changes recorded yet.</div>';
-
-  return `
-    <div class="section-title"><span class="material-symbols-outlined">event_upcoming</span> Tracked Events</div>
-    ${slotsHtml}
-    <div class="section-title"><span class="material-symbols-outlined">list_alt</span> Global Change Log</div>
-    <div class="log-card">${full}</div>
   `;
 }
 
@@ -2241,11 +1900,6 @@ async function load() {
   } finally {
   }
 }
-
-document.getElementById('app').addEventListener('toggle', (e) => {
-  const k = e.target.dataset && e.target.dataset.key; if (!k) return;
-  e.target.open ? open.add(k) : open.delete(k);
-}, true);
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;

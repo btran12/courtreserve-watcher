@@ -474,18 +474,21 @@
   /* Two inner columns specifically for registered roster */
   .roster-2col {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 8px 16px;
   }
 
   ol.people-list {
     margin: 0;
-    padding-left: 20px;
+    /* Numbers sit inside the list box, so long names never push a marker out of the card. */
+    padding-left: 0;
+    list-style-position: inside;
     font-size: 0.875rem;
   }
 
   ol.people-list li {
     padding: 2px 0;
+    overflow-wrap: anywhere;
   }
 
   /* Unfilled capacity: numbered but blank rows, e.g. "24. __________" */
@@ -1458,7 +1461,7 @@
     }
     .day-slot-body .box-container { padding: 8px; }
     .day-slot-body .box-title { font-size: 0.78rem; margin-bottom: 4px; }
-    .day-slot-body .people-list { font-size: 0.9rem; padding-left: 16px; }
+    .day-slot-body .people-list { font-size: 0.9rem; }
     .day-slot-body .people-list li { padding: 3px 0; }
     .day-slot-body .empty-state { font-size: 0.85rem; }
 
@@ -2516,12 +2519,10 @@
   }
 
 
-  /* ── Registered names: bigger text and a comfortable tap target ── */
+  /* ── Registered roster: a little larger, numbered rows kept inside the card ── */
   ol.people-list:not(.waitlist-list) { font-size: 0.95rem; }
-  .cal-roster-list:not(.waitlist-list) { font-size: 0.86rem; }
 
-  ol.people-list:not(.waitlist-list) .name-btn,
-  .cal-roster-list:not(.waitlist-list) .name-btn {
+  ol.people-list:not(.waitlist-list) .name-btn {
     display: inline-block;
     padding: 2px 0;
     min-height: 26px;
@@ -2529,23 +2530,14 @@
   }
 
   @media (max-width: 600px) {
-    ol.people-list:not(.waitlist-list) { font-size: 1.05rem; }
-    .cal-roster-list:not(.waitlist-list) { font-size: 0.92rem; }
+    ol.people-list:not(.waitlist-list) { font-size: 1rem; }
 
-    ol.people-list:not(.waitlist-list) .name-btn,
-    .cal-roster-list:not(.waitlist-list) .name-btn {
-      padding: 6px 0;
-      min-height: 38px;
+    ol.people-list:not(.waitlist-list) .name-btn {
+      padding: 5px 0;
+      min-height: 36px;
     }
-    ol.people-list:not(.waitlist-list) li.open-slot,
-    .cal-roster-list:not(.waitlist-list) li.open-slot {
-      padding-top: 6px;
-      padding-bottom: 6px;
+    ol.people-list:not(.waitlist-list) li.open-slot {
+      padding-top: 5px;
+      padding-bottom: 5px;
     }
-  }
-
-
-  /* Bigger names need a little more room before the week card starts scrolling */
-  @media (max-width: 600px) {
-    .cal-roster-list:not(.waitlist-list) { max-height: 210px; }
   }
