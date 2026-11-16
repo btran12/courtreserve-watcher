@@ -84,15 +84,27 @@ function buildSlots(events, now) {
 function mergePeople(perEvent) {
   const people = {};
   for (const { eventName, reg, wait } of perEvent) {
-    const add = (name, status) => {
+    // Entries are {name, id} once participants come from the portal JSON, but old
+    // snapshots (and the HTML fallback) may still hold plain name strings.
+    const add = (entry, status) => {
+      const name = typeof entry === 'string' ? entry : entry && entry.name;
+      const id = typeof entry === 'string' ? null : (entry && entry.id) || null;
+      if (!name) return;
       const p = people[name] || (people[name] = { status, ev: [] });
       if (status === 'reg') p.status = 'reg';
+      if (id && !p.id) p.id = String(id);
       if (!p.ev.includes(eventName)) p.ev.push(eventName);
     };
     reg.forEach((n) => add(n, 'reg'));
     wait.forEach((n) => add(n, 'wait'));
   }
   return people;
+}
+
+// Roster arrays in a snapshot stay plain names so existing viewers keep working;
+// the OrganizationMemberId lives next to each person in `people`.
+function namesOf(list) {
+  return (list || []).map((x) => (typeof x === 'string' ? x : x && x.name)).filter(Boolean);
 }
 
 function diffSlot(oldPeople, newPeople) {
@@ -136,50 +148,105 @@ async function readWeek(startLocal) {
   return j.Data || [];
 }
 
+// Participants of one reservation, as [{ name, id }] for registrants and waitlist, plus capacity.
+//
+// Asking ApiDetails with the portal's React headers ("X-Requested-By: ReactApp" + ajaxCall)
+// makes it answer with the portal JSON model instead of the legacy HTML tables. The JSON is the
+// only variant that carries each registrant's OrganizationMemberId (the member barcode number);
+// the HTML tables only expose names. The HTML tables stay as a fallback.
 async function readParticipants(number) {
-  // The Events/Details page is now a React SPA shell; call the details API it uses directly.
   const apiUri = new URL('https://app.courtreserve.com/Online/EventsApi/ApiDetails');
   apiUri.searchParams.set('id', CONFIG.orgId);
   apiUri.searchParams.set('number', number);
   apiUri.searchParams.set('ajaxCall', 'true');
-  console.log(`${apiUri.toString()}`)
   const r = await fetch(apiUri.toString(), {
     headers: {
       'User-Agent': DEFAULT_UA,
       'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'X-Requested-By': 'ReactApp',
+      'reactsubmit': 'true',
+      'uiculture': 'en-US',
+      'Accept': 'application/json, text/plain, */*',
       'Accept-Language': 'en-US,en;q=0.9',
       'Referer': `https://app.courtreserve.com/Online/Events/Details/${CONFIG.orgId}?number=${number}`,
-      'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-      'Sec-Ch-Ua-Mobile': '?0',
-      'Sec-Ch-Ua-Platform': '"Windows"',
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'same-origin',
     }
   });
   if (!r.ok) throw new Error(`ApiDetails HTTP ${r.status}`);
-  const detailHtml = await r.text();
-  
-  const extractNames = (sectionTestId) => {
+  const payload = await r.text();
+
+  let model = null;
+  try {
+    const j = JSON.parse(payload);
+    model = j && j.Data && j.Data.EventData;
+  } catch { /* legacy HTML response */ }
+
+  if (model) {
+    const result = participantsFromModel(model);
+    console.log(`[ApiDetails] Event ${number}: ${result.reg.length} registrants `
+      + `(${result.reg.filter((p) => p.id).length} with member id), ${result.wait.length} waitlisted`);
+    return result;
+  }
+
+  return participantsFromHtml(number, payload);
+}
+
+// Portal JSON model (Data.EventData). Registrants carry OrganizationMemberId; waitlist entries
+// only expose MemberId, so their id stays null. Guests are appended the way the portal labels
+// them ("Name (G)").
+function participantsFromModel(ev) {
+  const nameOf = (m) => clean(m.FullName || `${m.FirstName || ''} ${m.LastName || ''}`);
+  const orgId = (m) => (m.OrganizationMemberId != null ? String(m.OrganizationMemberId) : null);
+  const entry = (m, suffix = '') => ({ name: nameOf(m) + suffix, id: orgId(m) });
+
+  const reg = (ev.AllRegisteredMembers || [])
+    .filter((m) => m.IsCancelled !== true)
+    .map((m) => entry(m))
+    .concat((ev.ReservationGuests || [])
+      .filter((g) => g.IsCancelled !== true)
+      .map((g) => entry(g, ' (G)')))
+    .filter((p) => p.name);
+
+  const wait = (ev.ReservationWaitListMembers || [])
+    .filter((m) => m.IsCancelled !== true)
+    .map((m) => entry(m))
+    .filter((p) => p.name);
+
+  const max = Number(ev.MaxPlayers);
+  let capacity = Number.isFinite(max) && max > 0 ? max : null;
+  const places = Number(ev.PlacesAvailable);
+  let spotsRemaining = Number.isFinite(places) && ev.PlacesAvailable != null ? Math.max(0, places) : null;
+  if (spotsRemaining == null && capacity != null) spotsRemaining = Math.max(0, capacity - reg.length);
+  if (spotsRemaining == null && ev.IsFull === true) spotsRemaining = 0;
+
+  return { reg, wait, capacity, spotsRemaining };
+}
+
+// Fallback: the legacy HTML tables. Names only - member ids are scraped from the row markup if
+// CourtReserve ever adds them there.
+function participantsFromHtml(number, detailHtml) {
+  const extract = (sectionTestId) => {
     const tableRegex = new RegExp(`data-testid="${sectionTestId}"[\\s\\S]*?<\\/tbody>`, 'i');
     const match = tableRegex.exec(detailHtml);
-    if (!match) {
-      console.log(`[DEBUG] Table testid "${sectionTestId}" not found in HTML`);
-      return [];
-    }
+    if (!match) return null;
     const rowRegex = /<th[^>]*scope="row"[^>]*>([\s\S]*?)<\/th>/gi;
-    const names = [];
+    const out = [];
     let rMatch;
     while ((rMatch = rowRegex.exec(match[0])) !== null) {
       const cleaned = clean(rMatch[1].replace(/<[^>]*>/g, ''));
-      if (cleaned) names.push(cleaned);
+      if (!cleaned) continue;
+      const idMatch = /(?:organizationmemberid|orgmemberid|memberid)["'\s:=]+(\d+)/i.exec(rMatch[0]);
+      out.push({ name: cleaned, id: idMatch ? idMatch[1] : null });
     }
-    return names;
+    return out;
   };
 
-  const reg = extractNames('registrants-table-body');
-  const wait = extractNames('waitlisted-table-body');
+  const reg = extract('registrants-table-body');
+  const wait = extract('waitlisted-table-body');
+  // Neither table at all means this is an error/challenge page, not an empty event: fail the
+  // slot instead of overwriting a good roster with nothing.
+  if (!reg && !wait) throw new Error('ApiDetails: unexpected payload (no participants table)');
+
+  console.log(`[ApiDetails] Event ${number}: HTML fallback, ${reg.length} registrants, ${wait.length} waitlisted`);
 
   // Extract capacity / spots from the detail page HTML
   let capacity = null;
@@ -308,8 +375,8 @@ async function main() {
         capacity: (perEventMap[e.name] || {}).capacity != null ? perEventMap[e.name].capacity : e.capacity,
         spotsRemaining: (perEventMap[e.name] || {}).spotsRemaining != null ? perEventMap[e.name].spotsRemaining : e.spotsRemaining,
         durationMin: e.durationMin || null,
-        reg: (perEventMap[e.name] || {}).reg || [],
-        wait: (perEventMap[e.name] || {}).wait || [],
+        reg: namesOf((perEventMap[e.name] || {}).reg),
+        wait: namesOf((perEventMap[e.name] || {}).wait),
       })),
       people, updated: ts
     };

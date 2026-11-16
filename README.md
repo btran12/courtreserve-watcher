@@ -47,7 +47,7 @@ It tracks evening events (Monday, Wednesday, Friday after 7:00 PM), monitors reg
 1. **Scheduled Runs**: GitHub Actions runs `watcher.js` every 15 minutes using Node.js.
 2. **Fetch History**: The script downloads the current `state.json` from the CloudFront distribution to maintain state continuity.
 3. **Scan Events**: It scans the upcoming 4 weeks of the CourtReserve calendar for organization `17397`.
-4. **Scrape Registrants**: For matching slots (Mon/Wed/Fri starting at or after 7:00 PM), it extracts participant and waitlist tables.
+4. **Scrape Registrants**: For matching slots (Mon/Wed/Fri starting at or after 7:00 PM), it reads the event's `EventsApi/ApiDetails` payload. Requesting it with the member portal's React headers (`X-Requested-By: ReactApp` + `ajaxCall=true`) returns the portal JSON model instead of the legacy HTML tables, which is the only variant that includes each registrant's `OrganizationMemberId` (guests and waitlist entries have none). Names, member ids and spots/capacity come from that model; the old HTML tables are still parsed as a fallback.
 5. **Diff & Log**: It compares current participant lists with historical snapshots to detect:
    - ➕ **Joined** / **Waitlist Joined**
    - ➖ **Left** / **Waitlist Left**
@@ -55,6 +55,7 @@ It tracks evening events (Monday, Wednesday, Friday after 7:00 PM), monitors reg
    - ⬇️ **Demoted** (Moved from registered to waitlist)
 6. **Upload**: It uploads the refreshed state and change logs back to the AWS Lambda endpoint using a secure header token.
 7. **Open Courts** (AWS Lambda, `aws/index.mjs`): Each run reads the booking scheduler for the next 7 days (`CONFIG.courtDaysAhead`) and stores each court's free time windows in `state.courts`. It uses the same feed the CourtReserve booking page renders (`GET /Online/Reservations/ReadConsolidated/{orgId}` with the `X-Requested-By: ReactApp` header), which returns, per slot, the courts that are still bookable. That feed already excludes public events **and other members' reservations** ("Reserved" blocks) and court closures — unlike the older `/api/scheduler/member-expanded` endpoint, which only returns public events to anonymous callers and therefore over-reported free time. Opening hours, courts and the reservation interval come from the scheduler model (`/Online/Reservations/Bookings/{orgId}?sId=...` requested as JSON). The viewer shows the windows in the Day view (per court) and Week view (combined, with number of free courts).
+8. **Member IDs & barcodes** (viewer, `app.js`): Every roster name is a button. Tapping one opens a participant sheet with the stored `OrganizationMemberId` plus a Code 128 barcode generated from it (encoded in `app.js`, no external library) so it can be scanned at check-in. Snapshots keep the id next to each person in `people[name].id`, while the roster arrays stay plain name lists, so older `state.json` files keep rendering.
 
 ---
 

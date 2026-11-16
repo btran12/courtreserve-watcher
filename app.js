@@ -592,15 +592,23 @@ function userStatus(snapshot) {
   }
   return null;
 }
-function highlightName(name) {
-  if (!userName) return esc(name);
-  if (name.toLowerCase().trim() === userName.toLowerCase().trim()) return `<span class="user-match">${esc(name)}</span>`;
-  return esc(name);
+// Every roster name is a button: tapping it opens the participant sheet with the
+// CourtReserve OrganizationMemberId and a Code 128 barcode generated from it.
+function personButton(name, snapshot, waitlist = false) {
+  const matched = !!userName && name.toLowerCase().trim() === userName.toLowerCase().trim();
+  const inner = matched
+    ? `<span class="${waitlist ? 'user-match-waitlist' : 'user-match'}">${esc(name)}</span>`
+    : esc(name);
+  const key = snapshot && snapshot.key ? snapshot.key : '';
+  return `<button type="button" class="name-btn" title="${esc(name)} — member ID &amp; barcode"`
+    + ` onclick="event.stopPropagation();openPersonSheet('${esc(key)}','${esc(name)}')">${inner}</button>`;
 }
-function highlightNameWaitlist(name) {
-  if (!userName) return esc(name);
-  if (name.toLowerCase().trim() === userName.toLowerCase().trim()) return `<span class="user-match-waitlist">${esc(name)}</span>`;
-  return esc(name);
+
+function highlightName(name, snapshot) {
+  return personButton(name, snapshot, false);
+}
+function highlightNameWaitlist(name, snapshot) {
+  return personButton(name, snapshot, true);
 }
 
 // Blank, pre-numbered rows for the spots still open, e.g. "24. __________".
@@ -649,7 +657,7 @@ function renderPerEventSections(s) {
 
     const makeList = (items, startIdx) =>
       '<ol class="people-list" start="' + startIdx + '">' +
-      items.map((n) => n == null ? OPEN_SLOT_LI : '<li>' + highlightName(n) + '</li>').join('') +
+      items.map((n) => n == null ? OPEN_SLOT_LI : '<li>' + highlightName(n, s) + '</li>').join('') +
       '</ol>';
 
     const regHtml = entries.length
@@ -657,7 +665,7 @@ function renderPerEventSections(s) {
       : '<div class="empty-state">No registered participants yet</div>';
 
     const waitHtml = waitNames.length
-      ? '<ol class="people-list waitlist-list">' + waitNames.map((n) => '<li>' + highlightNameWaitlist(n) + '</li>').join('') + '</ol>'
+      ? '<ol class="people-list waitlist-list">' + waitNames.map((n) => '<li>' + highlightNameWaitlist(n, s) + '</li>').join('') + '</ol>'
       : '';
 
     const url = evt.number ? 'https://app.courtreserve.com/Online/Events/Details/17397/' + encodeURIComponent(evt.number) : '#';
@@ -933,6 +941,166 @@ function renderCourtsModal() {
     requestAnimationFrame(() => {
       body.scrollTop = Math.max(0, nowTop - body.clientHeight / 3);
     });
+  }
+}
+
+// ── Participant sheet: OrganizationMemberId + membership barcode ──
+// CourtReserve identifies a member in an organization by OrganizationMemberId, which is what the
+// club scans at check-in. The watcher stores it per participant; tapping a roster name opens this
+// sheet, which shows the id and a Code 128 barcode generated from it (no external library, so the
+// page stays self-contained and works offline / from file://).
+let personSheet = null; // { key: slot key, name: participant name }
+
+// Code 128 symbol patterns: bar/space widths, always starting with a bar. Index 106 is the stop
+// pattern (7 widths, 13 modules); every other symbol is 11 modules wide.
+const CODE128 = [
+  '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312', '132212', '221213',
+  '221312', '231212', '112232', '122132', '122231', '113222', '123122', '123221', '223211', '221132',
+  '221231', '213212', '223112', '312131', '311222', '321122', '321221', '312212', '322112', '322211',
+  '212123', '212321', '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+  '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121', '313121', '211331',
+  '231131', '213113', '213311', '213131', '311123', '311321', '331121', '312113', '312311', '332111',
+  '314111', '221411', '431111', '111224', '111422', '121124', '121421', '141122', '141221', '112214',
+  '112412', '122114', '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+  '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112', '421211', '212141',
+  '214121', '412121', '111143', '111341', '131141', '114113', '114311', '411113', '411311', '113141',
+  '114131', '311141', '411131', '211412', '211214', '211232', '2331112',
+];
+const CODE128_START_B = 104;
+const CODE128_STOP = 106;
+
+// Code 128 code set B covers printable ASCII (space..~), which is all a member id ever needs.
+function code128Modules(value) {
+  const text = String(value ?? '');
+  if (!text || [...text].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) > 126)) return '';
+  const codes = [CODE128_START_B];
+  for (const ch of text) codes.push(ch.charCodeAt(0) - 32);
+  // Checksum: start value + sum(value * position), positions starting at 1, modulo 103.
+  const checksum = codes.reduce((sum, code, i) => sum + code * (i === 0 ? 1 : i), 0) % 103;
+  codes.push(checksum, CODE128_STOP);
+
+  let modules = '';
+  codes.forEach((code, i) => {
+    const pattern = CODE128[code];
+    if (!pattern) return;
+    for (let k = 0; k < pattern.length; k++) {
+      modules += (k % 2 === 0 ? '1' : '0').repeat(Number(pattern[k]));
+    }
+  });
+  return modules;
+}
+
+function barcodeSvg(value) {
+  const modules = code128Modules(value);
+  if (!modules) return '';
+  const quiet = 10; // quiet zone, in modules
+  const width = modules.length + quiet * 2;
+  let bars = '';
+  for (let i = 0; i < modules.length;) {
+    if (modules[i] === '0') { i++; continue; }
+    let end = i;
+    while (end < modules.length && modules[end] === '1') end++;
+    bars += `<rect x="${quiet + i}" y="0" width="${end - i}" height="64"/>`;
+    i = end;
+  }
+  return `<svg class="person-barcode-svg" viewBox="0 0 ${width} 64" preserveAspectRatio="none"`
+    + ` shape-rendering="crispEdges" role="img" aria-label="Barcode ${esc(value)}">${bars}</svg>`;
+}
+
+function openPersonSheet(slotKey, name) {
+  personSheet = { key: slotKey, name };
+  renderPersonSheet();
+}
+
+function closePersonSheet() {
+  personSheet = null;
+  const overlay = document.getElementById('personModal');
+  if (overlay) overlay.classList.remove('open');
+  document.body.classList.remove('modal-open');
+}
+
+function renderPersonSheet() {
+  const overlay = document.getElementById('personModal');
+  const title = document.getElementById('personModalTitle');
+  const sub = document.getElementById('personModalSub');
+  const body = document.getElementById('personModalBody');
+  if (!overlay || !body || !personSheet) return;
+
+  const snapshot = currentData && currentData.snapshots ? currentData.snapshots[personSheet.key] : null;
+  const person = snapshot && snapshot.people ? snapshot.people[personSheet.name] : null;
+  const name = personSheet.name;
+  const id = person && person.id ? String(person.id) : '';
+  const status = person ? (person.status === 'wait' ? 'wait' : 'reg') : null;
+  const events = (person && person.ev) || [];
+
+  if (title) title.textContent = name;
+  if (sub) {
+    sub.textContent = [
+      status === 'wait' ? 'On the waitlist' : status === 'reg' ? 'Registered' : 'Participant',
+      events.join(' / '),
+    ].filter(Boolean).join(' \u00b7 ');
+  }
+
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
+  const statusChip = status === 'wait'
+    ? '<span class="person-status wait"><span class="material-symbols-outlined">hourglass_empty</span> Waitlisted</span>'
+    : status === 'reg'
+      ? '<span class="person-status reg"><span class="material-symbols-outlined">check_circle</span> Registered</span>'
+      : '';
+
+  const idBlock = id
+    ? `<div class="person-field">
+        <span class="person-field-label">Organization Member ID</span>
+        <div class="person-id-row">
+          <span class="person-id-value">${esc(id)}</span>
+          <button type="button" class="person-copy-btn" onclick="copyPersonId('${esc(id)}')">
+            <span class="material-symbols-outlined">content_copy</span> Copy
+          </button>
+        </div>
+      </div>
+      <div class="person-barcode-wrap">
+        ${barcodeSvg(id)}
+        <span class="person-barcode-text">${esc(id)}</span>
+      </div>
+      <p class="person-hint">Show this barcode at the front desk to check in.</p>`
+    : `<div class="person-empty">
+        <span class="material-symbols-outlined">barcode</span>
+        <p>CourtReserve did not return an Organization Member ID for this participant. Guests and
+        waitlist entries do not have one.</p>
+      </div>`;
+
+  body.innerHTML = `
+    <div class="person-head">
+      <span class="person-avatar">${esc(initials || '?')}</span>
+      <div class="person-head-text">
+        <div class="person-name">${esc(name)}</div>
+        ${statusChip}
+      </div>
+    </div>
+    ${idBlock}`;
+
+  overlay.classList.add('open');
+  document.body.classList.add('modal-open');
+}
+
+function copyPersonId(id) {
+  const copied = () => showToast({ type: 'notify', title: 'Member ID copied', summary: id }, { device: false });
+  const fallback = () => {
+    const area = document.createElement('textarea');
+    area.value = id;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    try { document.execCommand('copy'); } catch { /* nothing else to try */ }
+    area.remove();
+    copied();
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(id).then(copied).catch(fallback);
+  } else {
+    fallback();
   }
 }
 
@@ -1424,7 +1592,7 @@ function renderWeekView(d) {
                 <span><span class="material-symbols-outlined" style="font-size:13px; color:#2e7d32; vertical-align:middle;">group</span> Registered (${regNames.length})</span>
               </div>
               ${regEntries.length 
-                ? `<ol class="cal-roster-list">${regEntries.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n)}</li>`).join('')}</ol>`
+                ? `<ol class="cal-roster-list">${regEntries.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n, s)}</li>`).join('')}</ol>`
                 : `<div class="empty-state" style="font-size:0.75rem; padding:4px 0;">None</div>`
               }
 
@@ -1432,7 +1600,7 @@ function renderWeekView(d) {
                 <div class="cal-roster-title" style="margin-top:8px;">
                   <span><span class="material-symbols-outlined" style="font-size:13px; color:#ed6c02; vertical-align:middle;">hourglass_empty</span> Waitlist (${waitNames.length})</span>
                 </div>
-                <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>
+                <ol class="cal-roster-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n, s)}</li>`).join('')}</ol>
               ` : ''}
             </div>
 </div>
@@ -1568,7 +1736,7 @@ function renderDayView(d) {
 
       const makeList = (items, startIdx) => 
         `<ol class="people-list" start="${startIdx}">` +
-        items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n)}</li>`).join('') +
+        items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n, s)}</li>`).join('') +
         `</ol>`;
 
       const regRosterHtml = regEntries.length 
@@ -1576,7 +1744,7 @@ function renderDayView(d) {
         : '<div class="empty-state">No registered participants yet</div>';
 
       const waitRosterHtml = waitNames.length
-        ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('')}</ol>`
+        ? `<ol class="people-list waitlist-list">${waitNames.map((n) => `<li>${highlightNameWaitlist(n, s)}</li>`).join('')}</ol>`
         : '<div class="empty-state">No one on the waitlist</div>';
 
       const slotLog = log.filter((l) => l.slot === s.key).slice(0, 50);
@@ -1682,7 +1850,7 @@ function renderListView(d) {
     const col2 = entries.slice(half);
     const makeList = (items, startIdx) =>
       `<ol class="people-list" start="${startIdx}">` +
-      items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n)}</li>`).join('') +
+      items.map((n) => n == null ? OPEN_SLOT_LI : `<li>${highlightName(n, s)}</li>`).join('') +
       `</ol>`;
     return `<div class="roster-2col"><div>${makeList(col1, 1)}</div><div>${col2.length ? makeList(col2, half + 1) : ''}</div></div>`;
   };
@@ -1693,7 +1861,7 @@ function renderListView(d) {
       .map(([n]) => n)
       .sort((a, b) => a.localeCompare(b));
     if (!names.length) return '<div class="empty-state">None</div>';
-    return `<ol class="people-list">` + names.map((n) => `<li>${highlightNameWaitlist(n)}</li>`).join('') + `</ol>`;
+    return `<ol class="people-list">` + names.map((n) => `<li>${highlightNameWaitlist(n, s)}</li>`).join('') + `</ol>`;
   };
 
   const sortedSlots = Object.values(d.snapshots).sort((a, b) => a.key.localeCompare(b.key));
@@ -1842,7 +2010,7 @@ function renderActivityView(d) {
     ${separator}
     <div class="activity-log-row">
       <span class="act-icon material-symbols-outlined" style="color:${tone}">${ICON[l.type] || 'info'}</span>
-      <span class="act-name">${highlightName(l.name)}</span>
+      <span class="act-name">${esc(l.name)}</span>
       <span class="action-chip ${cls(l.type)}">${esc(SHORT[l.type] || TEXT[l.type] || l.type)}</span>
       <span class="act-meta" title="${esc(meta)}">${esc(meta)}</span>
       <span class="act-time">${new Date(l.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
@@ -1892,6 +2060,9 @@ function render(d) {
     if (currentView === 'day') renderCourtsModal();
     else closeCourtsModal();
   }
+
+  // Same for the participant sheet: pick up the newest id/barcode from the refreshed snapshot.
+  if (personSheet) renderPersonSheet();
 
   checkWatchedChanges(d);
 
@@ -2039,7 +2210,7 @@ function attachSwipeHandlers() {
 
 // Arrow keys do the same on desktop, as long as the user is not typing and no overlay is open.
 document.addEventListener('keydown', (event) => {
-  if (currentView !== 'day' || courtsModalDate) return;
+  if (currentView !== 'day' || courtsModalDate || personSheet) return;
   if (document.body.classList.contains('nav-open') || document.querySelector('dialog[open]')) return;
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   if (event.target.closest && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;
@@ -2081,7 +2252,11 @@ document.addEventListener('visibilitychange', () => {
   syncNotifyButton(); // the user may have changed the site permission outside the app
   load();
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && courtsModalDate) closeCourtsModal(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (courtsModalDate) closeCourtsModal();
+  else if (personSheet) closePersonSheet();
+});
 setInterval(load, 60000);
 syncNotifyButton();
 load();

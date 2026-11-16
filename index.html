@@ -162,6 +162,22 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
+<!-- Participant sheet: CourtReserve member id + check-in barcode -->
+<div id="personModal" class="courts-modal-overlay" onclick="if (event.target === this) closePersonSheet()">
+  <div class="courts-modal person-modal" role="dialog" aria-modal="true" aria-labelledby="personModalTitle">
+    <div class="courts-modal-head">
+      <div class="courts-modal-heading">
+        <h2 id="personModalTitle">Participant</h2>
+        <span id="personModalSub" class="courts-modal-sub"></span>
+      </div>
+      <button type="button" class="courts-modal-close" onclick="closePersonSheet()" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div id="personModalBody" class="person-modal-body"></div>
+  </div>
+</div>
+
 <!-- Name prompt overlay -->
 <div id="namePrompt" class="prompt-overlay">
   <div class="prompt-card">
