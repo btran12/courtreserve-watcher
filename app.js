@@ -58,6 +58,7 @@ const watchedEvents = new Set(JSON.parse(localStorage.getItem('crw_watched') || 
 let lastWatchSnapshot = JSON.parse(localStorage.getItem('crw_watch_snapshot') || '{}');
 
 function toggleWatch(slotKey) {
+  haptic();
   if (watchedEvents.has(slotKey)) {
     watchedEvents.delete(slotKey);
   } else {
@@ -571,7 +572,9 @@ function updateNameDisplay() {
 }
 
 function setUserName(name) {
-  userName = name.trim();
+  const next = name.trim();
+  if (next !== userName) haptic();
+  userName = next;
   localStorage.setItem('crw_user_name', userName);
   const input = document.getElementById('userNameInput');
   const check = document.getElementById('userNameCheck');
@@ -914,6 +917,7 @@ function renderCourtsModal() {
 let personSheet = null; // { key: slot key, name: participant name }
 
 function openPersonSheet(slotKey, name) {
+  haptic(); // participant names are the main tap target: ack the tap before the sheet opens
   personSheet = { key: slotKey, name };
   renderPersonSheet();
 }
@@ -990,6 +994,7 @@ function renderPersonSheet() {
 }
 
 function copyPersonId(id) {
+  haptic();
   const copied = () => showToast({ type: 'notify', title: 'Member ID copied', summary: id }, { device: false });
   const fallback = () => {
     const area = document.createElement('textarea');
@@ -1167,6 +1172,7 @@ function initDateIfNeeded(data) {
 }
 
 function navToday() {
+  haptic();
   selectedDate = new Date();
   pendingViewAnim = 'enter';
   syncUrl();
@@ -1174,6 +1180,7 @@ function navToday() {
 }
 
 function navPrev() {
+  haptic();
   selectedDate.setDate(selectedDate.getDate() - 1);
   pendingViewAnim = 'prev';
   syncUrl();
@@ -1181,6 +1188,7 @@ function navPrev() {
 }
 
 function navNext() {
+  haptic();
   selectedDate.setDate(selectedDate.getDate() + 1);
   pendingViewAnim = 'next';
   syncUrl();
@@ -1188,6 +1196,7 @@ function navNext() {
 }
 
 function selectDay(dateStr) {
+  haptic();
   const [y, m, d] = dateStr.split('-').map(Number);
   const nextDate = new Date(y, m - 1, d);
   const prevKey = toDateStr(selectedDate);
@@ -1565,6 +1574,7 @@ function render(d) {
   if (editBtn && !editBtn.dataset.bound) {
     editBtn.dataset.bound = '1';
     editBtn.addEventListener('click', () => {
+      haptic();
       document.getElementById('userNameDisplay').classList.remove('visible');
       document.getElementById('userNameInputWrap').classList.add('visible');
       document.getElementById('userNameInput').focus();

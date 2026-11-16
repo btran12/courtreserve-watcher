@@ -144,7 +144,10 @@
     }
   }
 
-  el.refresh?.addEventListener('click', load);
+  el.refresh?.addEventListener('click', () => {
+    haptic();
+    load();
+  });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   setInterval(load, 60000);
   render();

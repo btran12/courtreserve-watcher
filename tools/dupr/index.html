@@ -798,6 +798,8 @@
   </a>
 </nav>
 
+<script src="../../haptic.js"></script>
+
 <script>
 const $ = (id) => document.getElementById(id);
 const el = {
@@ -1488,12 +1490,12 @@ function syncSettingsFields() {
 }
 
 // ── events ───────────────────────────────────────────────────────────────────
-el.modeSingle.addEventListener('click', () => setMode('single'));
-el.modeMulti.addEventListener('click', () => setMode('multi'));
-el.singleGo.addEventListener('click', runSingle);
-el.singleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSingle(); });
-el.multiGo.addEventListener('click', runMulti);
-el.names.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runMulti(); });
+el.modeSingle.addEventListener('click', () => { haptic(); setMode('single'); });
+el.modeMulti.addEventListener('click', () => { haptic(); setMode('multi'); });
+el.singleGo.addEventListener('click', () => { haptic(); runSingle(); });
+el.singleInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { haptic(); runSingle(); } });
+el.multiGo.addEventListener('click', () => { haptic(); runMulti(); });
+el.names.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { haptic(); runMulti(); } });
 el.clearBtn.addEventListener('click', () => {
   el.names.value = '';
   store.entries = [];
@@ -1502,7 +1504,7 @@ el.clearBtn.addEventListener('click', () => {
   clearUrlKeys('names', 'player');
 });
 el.verifyBtn.addEventListener('click', verifyCookie);
-el.shareBtn.addEventListener('click', copyShareLink);
+el.shareBtn.addEventListener('click', () => { haptic(); copyShareLink(); });
 el.settingsBtn.addEventListener('click', () => {
   if (!el.settingsModal.open) el.settingsModal.showModal();
   syncSettingsFields();
@@ -1544,7 +1546,7 @@ el.playerModal.addEventListener('click', (e) => {
 });
 el.playerModal.addEventListener('close', () => clearUrlKeys('player'));
 el.playerBody.addEventListener('click', (e) => {
-  if (e.target.closest('#playerMore')) loadMorePlayerMatches();
+  if (e.target.closest('#playerMore')) { haptic(); loadMorePlayerMatches(); }
 });
 el.locInput.addEventListener('input', () => {
   if (!store.entries.length) return;
@@ -1560,6 +1562,7 @@ el.sortRating.addEventListener('change', () => {
 el.results.addEventListener('click', (e) => {
   const row = e.target.closest('.row');
   if (!row) return;
+  haptic();
   const entry = store.entries.find((x) => x.query === row.dataset.query);
   const hit = entry?.hits?.find((h) => h.id === row.dataset.id);
   store.picks[row.dataset.query] = row.dataset.id;

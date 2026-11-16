@@ -9,10 +9,10 @@
  * style.css forever. Network-first removes that failure mode: a deploy is picked up on the
  * next load. Bump VERSION only if the PRECACHE list itself changes.
  */
-const VERSION = 4;
+const VERSION = 5;
 const CACHE = `crw-v${VERSION}`;
 const OFFLINE_SHELL = 'index.html';
-const PRECACHE = ['index.html', 'activity.html', 'barcode.html', 'app.js', 'activity.js', 'barcode.js', 'style.css', 'icon.png', 'manifest.json'];
+const PRECACHE = ['index.html', 'activity.html', 'barcode.html', 'app.js', 'activity.js', 'barcode.js', 'haptic.js', 'style.css', 'icon.png', 'manifest.json'];
 
 // Live data: never intercepted, so app.js's `cache: 'no-store'` does its job.
 const NEVER_CACHE = [/\/courtreserve-watcher\/state\.json$/i];

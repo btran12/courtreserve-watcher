@@ -262,6 +262,7 @@
     const input = document.getElementById('checkinNameInput');
     const value = ((input && input.value) || '').trim();
     if (!value) { if (input) input.focus(); return; }
+    haptic();
     state.user = value;
     state.editing = false;
     try { localStorage.setItem(NAME_KEY, value); } catch { /* private mode */ }
@@ -269,6 +270,7 @@
   }
 
   function copyMemberId(id) {
+    haptic();
     const done = () => flashBanner('Member ID copied.', false);
     const fallback = () => {
       const area = document.createElement('textarea');
@@ -302,8 +304,8 @@
     const button = event.target.closest('button');
     if (!button) return;
     if (button.id === 'saveCheckinName') saveName();
-    else if (button.id === 'cancelCheckinName') { state.editing = false; render(); }
-    else if (button.id === 'changeName') { state.editing = true; render(); }
+    else if (button.id === 'cancelCheckinName') { haptic(); state.editing = false; render(); }
+    else if (button.id === 'changeName') { haptic(); state.editing = true; render(); }
     else if (button.id === 'copyMemberId') copyMemberId(button.dataset.id || '');
   });
   el.card.addEventListener('keydown', (event) => {
@@ -341,7 +343,10 @@
     }
   }
 
-  el.refresh?.addEventListener('click', load);
+  el.refresh?.addEventListener('click', () => {
+    haptic();
+    load();
+  });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
   window.addEventListener('storage', (event) => {
     if (event.key !== NAME_KEY) return;
