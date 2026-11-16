@@ -12,7 +12,8 @@ const CONFIG = {
   startAtOrAfterMinutes: 19 * 60,
   weeksAhead: 3,
   courtDaysAhead: 7, // only the next week of court availability is needed
-  maxLogEntries: 3000,
+  snapshotKeepDays: 14, // drop tracked slots + log lines older than this so state.json stays small
+  maxLogEntries: 500,
   concurrency: 3,
   courtSchedulerId: '22028', // sId from /Online/Reservations/Bookings/{orgId}?sId=...
   timeZone: 'America/New_York',
@@ -86,15 +87,27 @@ function buildSlots(events, now) {
 function mergePeople(perEvent) {
   const people = {};
   for (const { eventName, reg, wait } of perEvent) {
-    const add = (name, status) => {
+    // Entries are {name, id} once participants come from the portal JSON, but old
+    // snapshots (and the HTML fallback) may still hold plain name strings.
+    const add = (entry, status) => {
+      const name = typeof entry === 'string' ? entry : entry && entry.name;
+      const id = typeof entry === 'string' ? null : (entry && entry.id) || null;
+      if (!name) return;
       const p = people[name] || (people[name] = { status, ev: [] });
       if (status === 'reg') p.status = 'reg';
+      if (id && !p.id) p.id = String(id);
       if (!p.ev.includes(eventName)) p.ev.push(eventName);
     };
     reg.forEach((n) => add(n, 'reg'));
     wait.forEach((n) => add(n, 'wait'));
   }
   return people;
+}
+
+// Roster arrays in a snapshot stay plain names so existing viewers keep working;
+// the OrganizationMemberId lives next to each person in `people`.
+function namesOf(list) {
+  return (list || []).map((x) => (typeof x === 'string' ? x : x && x.name)).filter(Boolean);
 }
 
 function diffSlot(oldPeople, newPeople) {
@@ -138,54 +151,108 @@ async function readWeek(startLocal) {
   return j.Data || [];
 }
 
+// Participants of one reservation, as [{ name, id }] for registrants and waitlist, plus capacity.
+//
+// The Events/Details page is a React SPA shell, so we call the details API it uses directly.
+// Asking that endpoint with the portal's React headers ("X-Requested-By: ReactApp" + ajaxCall)
+// makes it answer with the portal JSON model instead of the legacy HTML tables. The JSON is the
+// only variant that carries each registrant's OrganizationMemberId (the member barcode number);
+// the HTML tables only ever expose names. The HTML tables are still parsed as a fallback in case
+// the endpoint ever stops honouring those headers.
 async function readParticipants(number) {
-  // The Events/Details page is now a React SPA shell; call the details API it uses directly.
   const apiUri = new URL('https://app.courtreserve.com/Online/EventsApi/ApiDetails');
   apiUri.searchParams.set('id', CONFIG.orgId);
   apiUri.searchParams.set('number', number);
   apiUri.searchParams.set('ajaxCall', 'true');
 
-  console.log(`${apiUri.toString()}`)
   const r = await fetch(apiUri.toString(), {
     headers: {
       'User-Agent': DEFAULT_UA,
       'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'X-Requested-By': 'ReactApp',
+      'reactsubmit': 'true',
+      'uiculture': 'en-US',
+      'Accept': 'application/json, text/plain, */*',
       'Accept-Language': 'en-US,en;q=0.9',
       'Referer': `https://app.courtreserve.com/Online/Events/Details/${CONFIG.orgId}?number=${number}`,
-      'Sec-Ch-Ua': '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-      'Sec-Ch-Ua-Mobile': '?0',
-      'Sec-Ch-Ua-Platform': '"Windows"',
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'same-origin',
     }
   });
   if (!r.ok) throw new Error(`ApiDetails HTTP ${r.status}`);
-  const detailHtml = await r.text();
+  const payload = await r.text();
 
-  console.log(`[DEBUG] Event ${number}: received ${detailHtml.length} chars from ApiDetails`);
-  
-  const extractNames = (sectionTestId) => {
+  let model = null;
+  try {
+    const j = JSON.parse(payload);
+    model = j && j.Data && j.Data.EventData;
+  } catch { /* legacy HTML response */ }
+
+  if (model) {
+    const result = participantsFromModel(model);
+    console.log(`[ApiDetails] Event ${number}: ${result.reg.length} registrants `
+      + `(${result.reg.filter((p) => p.id).length} with member id), ${result.wait.length} waitlisted`);
+    return result;
+  }
+
+  return participantsFromHtml(number, payload);
+}
+
+// Portal JSON model (Data.EventData). Registrants carry OrganizationMemberId; waitlist entries
+// only expose MemberId, so their id stays null. Guests are appended to the registrants the same
+// way the member portal labels them ("Name (G)").
+function participantsFromModel(ev) {
+  const nameOf = (m) => clean(m.FullName || `${m.FirstName || ''} ${m.LastName || ''}`);
+  const orgId = (m) => (m.OrganizationMemberId != null ? String(m.OrganizationMemberId) : null);
+  const entry = (m, suffix = '') => ({ name: nameOf(m) + suffix, id: orgId(m) });
+
+  const reg = (ev.AllRegisteredMembers || [])
+    .filter((m) => m.IsCancelled !== true)
+    .map((m) => entry(m))
+    .concat((ev.ReservationGuests || [])
+      .filter((g) => g.IsCancelled !== true)
+      .map((g) => entry(g, ' (G)')))
+    .filter((p) => p.name);
+
+  const wait = (ev.ReservationWaitListMembers || [])
+    .filter((m) => m.IsCancelled !== true)
+    .map((m) => entry(m))
+    .filter((p) => p.name);
+
+  const max = Number(ev.MaxPlayers);
+  let capacity = Number.isFinite(max) && max > 0 ? max : null;
+  const places = Number(ev.PlacesAvailable);
+  let spotsRemaining = Number.isFinite(places) && ev.PlacesAvailable != null ? Math.max(0, places) : null;
+  if (spotsRemaining == null && capacity != null) spotsRemaining = Math.max(0, capacity - reg.length);
+  if (spotsRemaining == null && ev.IsFull === true) spotsRemaining = 0;
+
+  return { reg, wait, capacity, spotsRemaining };
+}
+
+// Fallback: the legacy HTML tables. Names only - member ids are scraped from the row markup if
+// CourtReserve ever adds them there.
+function participantsFromHtml(number, detailHtml) {
+  const extract = (sectionTestId) => {
     const tableRegex = new RegExp(`data-testid="${sectionTestId}"[\\s\\S]*?<\\/tbody>`, 'i');
     const match = tableRegex.exec(detailHtml);
-    if (!match) {
-      console.log(`[DEBUG] Table testid "${sectionTestId}" not found in HTML`);
-      return [];
-    }
+    if (!match) return null;
     const rowRegex = /<th[^>]*scope="row"[^>]*>([\s\S]*?)<\/th>/gi;
-    const names = [];
+    const out = [];
     let rMatch;
     while ((rMatch = rowRegex.exec(match[0])) !== null) {
       const cleaned = clean(rMatch[1].replace(/<[^>]*>/g, ''));
-      if (cleaned) names.push(cleaned);
+      if (!cleaned) continue;
+      const idMatch = /(?:organizationmemberid|orgmemberid|memberid)["'\s:=]+(\d+)/i.exec(rMatch[0]);
+      out.push({ name: cleaned, id: idMatch ? idMatch[1] : null });
     }
-    return names;
+    return out;
   };
 
-  const reg = extractNames('registrants-table-body');
-  const wait = extractNames('waitlisted-table-body');
-  console.log(`[DEBUG] Event ${number}: Found ${reg.length} registrants, ${wait.length} waitlisted`);
+  const reg = extract('registrants-table-body');
+  const wait = extract('waitlisted-table-body');
+  // Neither table at all means this is an error/challenge page, not an empty event: fail the
+  // slot instead of overwriting a good roster with nothing.
+  if (!reg && !wait) throw new Error('ApiDetails: unexpected payload (no participants table)');
+
+  console.log(`[ApiDetails] Event ${number}: HTML fallback, ${reg.length} registrants, ${wait.length} waitlisted`);
 
   // Extract capacity / spots from the detail page HTML
   let capacity = null;
@@ -235,6 +302,7 @@ async function readParticipants(number) {
 
   return { reg, wait, capacity, spotsRemaining };
 }
+
 
 async function pool(items, n, fn) {
   const out = new Array(items.length);
@@ -379,7 +447,9 @@ async function readCourts(prev, todayStr, nowMin) {
     cfg = await readCourtConfig();
   } catch (e) {
     console.error('Failed to read court scheduler config:', e.message);
-    return prev; // keep the last known good availability rather than reporting wrong free time
+    // Keep the last known good availability rather than reporting wrong free time, but still
+    // drop the days that are already in the past so the payload cannot grow forever.
+    return pruneCourtDays(prev, todayStr);
   }
   const dates = Array.from({ length: CONFIG.courtDaysAhead }, (_, i) => addDays(todayStr, i));
   const results = await pool(dates, CONFIG.concurrency, async (date) => {
@@ -397,6 +467,43 @@ async function readCourts(prev, todayStr, nowMin) {
     else if (prevDays[date]) days[date] = prevDays[date];
   });
   return { open: hhmm(cfg.openMin), close: hhmm(cfg.closeMin), minInterval: cfg.minInterval, list: cfg.courts, days };
+}
+
+// Court availability is only ever kept for today onwards (one week ahead), so a failed run can
+// never leave stale days behind.
+function pruneCourtDays(courts, todayStr) {
+  if (!courts || !courts.days) return courts;
+  const days = {};
+  for (const [date, day] of Object.entries(courts.days)) {
+    if (date >= todayStr) days[date] = day;
+  }
+  return { ...courts, days };
+}
+
+// Retention: keep only the newest CONFIG.snapshotKeepDays of tracked slots and log lines.
+// Slot keys start with the local date ('YYYY-MM-DD HH:MM'), so they can be compared as strings;
+// log lines carry the same key in `slot`. Without this, every slot the watcher ever saw would be
+// kept forever and state.json would keep growing.
+function pruneState(state, todayStr) {
+  const cutoff = addDays(todayStr, -CONFIG.snapshotKeepDays);
+  let snapshots = 0;
+  let logEntries = 0;
+
+  const snap = state.snapshots || {};
+  for (const key of Object.keys(snap)) {
+    const date = (snap[key] && snap[key].date) || String(key).slice(0, 10);
+    if (!date || date < cutoff) { delete snap[key]; snapshots += 1; }
+  }
+  state.snapshots = snap;
+
+  const before = (state.log || []).length;
+  state.log = (state.log || []).filter((l) => {
+    const date = String((l && l.slot) || '').slice(0, 10);
+    return !date || date >= cutoff; // keep lines we cannot date rather than lose them silently
+  });
+  logEntries = before - state.log.length;
+
+  return { cutoff, snapshots, logEntries };
 }
 
 export const handler = async () => {
@@ -471,8 +578,8 @@ export const handler = async () => {
         capacity: (perEventMap[e.name] || {}).capacity != null ? perEventMap[e.name].capacity : e.capacity,
         spotsRemaining: (perEventMap[e.name] || {}).spotsRemaining != null ? perEventMap[e.name].spotsRemaining : e.spotsRemaining,
         durationMin: e.durationMin || null,
-        reg: (perEventMap[e.name] || {}).reg || [],
-        wait: (perEventMap[e.name] || {}).wait || [],
+        reg: namesOf((perEventMap[e.name] || {}).reg),
+        wait: namesOf((perEventMap[e.name] || {}).wait),
       })),
       people, updated: ts
     };
@@ -485,6 +592,14 @@ export const handler = async () => {
     console.error('Failed to read court availability:', e.message);
   }
   state.log = newLog.reverse().concat(state.log || []).slice(0, CONFIG.maxLogEntries);
+
+  // Drop history older than CONFIG.snapshotKeepDays so the stored document cannot grow without
+  // bound (the viewer only ever shows recent slots).
+  const pruned = pruneState(state, nyParts.dateStr);
+  if (pruned.snapshots || pruned.logEntries) {
+    console.log(`Pruned ${pruned.snapshots} snapshot(s) and ${pruned.logEntries} log line(s) `
+      + `older than ${pruned.cutoff}.`);
+  }
   state.lastRun = ts;
   state.updated = ts;
   state.initialized = true;
