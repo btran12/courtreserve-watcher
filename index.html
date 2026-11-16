@@ -36,6 +36,14 @@
           <span class="nav-menu-text"><b>CourtReserve Watcher</b><small>Court availability</small></span>
           <span class="material-symbols-outlined nav-menu-check">check</span>
         </a>
+        <a class="nav-menu-item" href="activity.html">
+          <span class="material-symbols-outlined nav-menu-icon">history</span>
+          <span class="nav-menu-text"><b>Activity</b><small>Recent roster changes</small></span>
+        </a>
+        <a class="nav-menu-item" href="barcode.html">
+          <span class="material-symbols-outlined nav-menu-icon">barcode</span>
+          <span class="nav-menu-text"><b>Check-in barcode</b><small>Your member barcode</small></span>
+        </a>
         <a class="nav-menu-item" href="tools/dupr/index.html">
           <span class="material-symbols-outlined nav-menu-icon">person_search</span>
           <span class="nav-menu-text"><b>DUPR lookup</b><small>Ratings &amp; match history</small></span>
@@ -77,6 +85,7 @@
   </div>
 </main>
 
+<script src="barcode.js" defer></script>
 <script src="app.js" defer></script>
 <script>
 // Header page menu: toggles the navigation panel and closes it on outside click / Escape.
@@ -197,6 +206,14 @@ if ('serviceWorker' in navigator) {
   <a class="bottom-nav-item" href="index.html" aria-current="page">
     <span class="bottom-nav-icon"><span class="material-symbols-outlined">calendar_month</span></span>
     <span class="bottom-nav-label">Watcher</span>
+  </a>
+  <a class="bottom-nav-item" href="activity.html">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">history</span></span>
+    <span class="bottom-nav-label">Activity</span>
+  </a>
+  <a class="bottom-nav-item" href="barcode.html">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">barcode</span></span>
+    <span class="bottom-nav-label">Barcode</span>
   </a>
   <a class="bottom-nav-item" href="tools/dupr/index.html">
     <span class="bottom-nav-icon"><span class="material-symbols-outlined">person_search</span></span>

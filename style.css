@@ -575,43 +575,9 @@
     border: 1px solid var(--md-outline);
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     flex-wrap: wrap;
     gap: 12px;
-  }
-
-  .view-segmented-btn {
-    display: inline-flex;
-    background: #f1f3f4;
-    padding: 3px;
-    border-radius: 24px;
-    border: 1px solid var(--md-outline);
-  }
-
-  .seg-btn {
-    border: none;
-    background: transparent;
-    padding: 6px 14px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--md-on-surface-variant);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: all 0.2s ease;
-  }
-
-  .seg-btn:hover {
-    color: var(--md-on-surface);
-  }
-
-  .seg-btn.active {
-    background: var(--md-surface);
-    color: var(--md-primary);
-    font-weight: 700;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
   }
 
   .date-nav-controls {
@@ -1382,27 +1348,14 @@
     /* Reload button: slightly smaller */
     .icon-btn { width: 36px; height: 36px; }
 
-    /* ── Tab menu: icon-only, full-width ── */
+    /* ── Date navigation: icon-only, full-width ── */
     .nav-toolbar {
       flex-direction: column;
       padding: 8px 10px;
       gap: 8px;
     }
-    .view-segmented-btn {
-      width: 100%;
-      justify-content: space-around;
-    }
-    .seg-btn {
-      padding: 6px 8px;
-      font-size: 0.8rem;
-      gap: 4px;
-      flex: 1;
-      justify-content: center;
-    }
-    .seg-btn .seg-label { display: none; }
-    .seg-btn .material-symbols-outlined { font-size: 20px; }
 
-    /* Date nav: full-width row below tabs */
+    /* Date nav: full-width row */
     .date-nav-controls {
       width: 100%;
       justify-content: space-between;
@@ -1726,6 +1679,19 @@
     .activity-log-row .action-chip { grid-area: chip; }
     .activity-log-row .act-time { grid-area: time; }
     .activity-log-row .act-meta { grid-area: meta; }
+  }
+
+  /* ── Activity page (standalone feed) ── */
+  .activity-page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 18px 16px 36px;
+  }
+  .activity-page .section-title { margin-top: 0; }
+
+  @media (max-width: 600px) {
+    .activity-page { padding: 12px 12px calc(96px + env(safe-area-inset-bottom)); }
+    .activity-page .section-title { font-size: 0.8rem; margin-left: 2px; }
   }
 
   /* ── Toast notifications ── */
@@ -2540,4 +2506,162 @@
       padding-top: 5px;
       padding-bottom: 5px;
     }
+  }
+
+  /* -- Check-in barcode page -------------------------------------------------- */
+  .checkin-page {
+    max-width: 460px;
+    margin: 0 auto;
+    padding: 18px 16px 36px;
+    display: grid;
+    gap: 14px;
+  }
+  .checkin-card {
+    background: var(--md-surface);
+    border: 1px solid var(--md-outline);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-1);
+    padding: 18px;
+  }
+  .checkin-card .person-head { margin-bottom: 16px; }
+  .checkin-card .person-avatar { width: 54px; height: 54px; font-size: 1.1rem; }
+  .checkin-card .person-name { font-size: 1.25rem; }
+  .checkin-meta {
+    margin-top: 4px;
+    font-size: 0.76rem;
+    color: var(--md-on-surface-variant);
+  }
+
+  .checkin-banner {
+    padding: 11px 14px;
+    border-radius: 12px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    background: var(--bg-join);
+    color: var(--color-join);
+  }
+  .checkin-banner.err { background: var(--bg-left); color: var(--color-left); }
+  .checkin-banner[hidden] { display: none; }
+
+  .checkin-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 32px 10px;
+    color: var(--md-on-surface-variant);
+    font-size: 0.88rem;
+  }
+  .checkin-loading .material-symbols-outlined {
+    font-size: 20px;
+    animation: spin 1s linear infinite;
+  }
+
+  .checkin-barcode {
+    margin-top: 14px;
+    padding: 18px 14px 12px;
+  }
+  .checkin-barcode .person-barcode-svg { height: 110px; }
+  .checkin-barcode .person-barcode-text { font-size: 0.95rem; letter-spacing: 4px; }
+
+  .checkin-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 18px 0 8px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--md-on-surface-variant);
+  }
+  .checkin-section-title .material-symbols-outlined { font-size: 16px; }
+
+  .checkin-events { display: grid; gap: 8px; }
+  .checkin-event {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--md-outline);
+    border-radius: 12px;
+  }
+  .checkin-event-text { min-width: 0; }
+  .checkin-event-when { font-size: 0.86rem; font-weight: 700; }
+  .checkin-event-ev {
+    margin-top: 1px;
+    font-size: 0.78rem;
+    color: var(--md-on-surface-variant);
+    overflow-wrap: anywhere;
+  }
+  .checkin-event-status { margin-left: auto; flex: 0 0 auto; }
+  .checkin-event-status .person-status { margin-top: 0; white-space: nowrap; }
+
+  .checkin-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+  }
+  .checkin-actions.centered { justify-content: center; }
+  .checkin-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 14px;
+    border: 1px solid var(--md-outline);
+    border-radius: 999px;
+    background: #fafafa;
+    color: var(--md-primary);
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .checkin-btn:hover { background: #f0f0f0; }
+  .checkin-btn:active { background: #e8e8e8; }
+  .checkin-btn.primary { background: var(--md-primary); border-color: transparent; color: #fff; }
+  .checkin-btn.primary:hover { background: var(--md-primary-variant); }
+  .checkin-btn .material-symbols-outlined { font-size: 17px; }
+
+  .checkin-setup { text-align: center; padding: 12px 6px 4px; }
+  .checkin-setup > .material-symbols-outlined { font-size: 42px; color: var(--md-primary); }
+  .checkin-setup h2 { margin: 8px 0 4px; font-size: 1.1rem; }
+  .checkin-setup p {
+    max-width: 320px;
+    margin: 0 auto 14px;
+    font-size: 0.84rem;
+    color: var(--md-on-surface-variant);
+  }
+  .checkin-input {
+    width: 100%;
+    max-width: 320px;
+    margin-bottom: 2px;
+    padding: 11px 14px;
+    border: 1px solid var(--md-outline);
+    border-radius: 10px;
+    background: var(--md-surface);
+    color: var(--md-on-surface);
+    font: inherit;
+    font-size: 0.92rem;
+  }
+  .checkin-input:focus { outline: none; border-color: var(--md-primary); }
+
+  .checkin-note {
+    margin: 14px 0 0;
+    font-size: 0.8rem;
+    color: var(--md-on-surface-variant);
+  }
+
+  .checkin-refresh.spinning .material-symbols-outlined { animation: spin 1s linear infinite; }
+
+  @media (max-width: 600px) {
+    .checkin-page { padding: 12px 12px calc(96px + env(safe-area-inset-bottom)); }
+    .checkin-card { padding: 16px 14px; }
+    .checkin-barcode .person-barcode-svg { height: 92px; }
+    .checkin-barcode .person-barcode-text { font-size: 0.85rem; letter-spacing: 3px; }
+    .checkin-event { flex-wrap: wrap; }
+    .checkin-event-status { margin-left: 0; }
+    .checkin-btn { flex: 1 1 auto; justify-content: center; min-height: 42px; }
   }

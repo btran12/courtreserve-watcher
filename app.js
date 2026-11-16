@@ -37,8 +37,8 @@ const NOTIFY_PREF_KEY = 'crw_notify_pref';   // 'on' | 'off', null until the use
 const NOTIFY_ASKED_KEY = 'crw_notify_asked'; // stops re-prompting after a dismissed permission dialog
 const notifySupported = typeof window !== 'undefined' && 'Notification' in window;
 let notifyPref = localStorage.getItem(NOTIFY_PREF_KEY);
-// Only two pages remain: the day view (with the court timeline) and the activity feed.
-let currentView = localStorage.getItem('crw_view') === 'activity' ? 'activity' : 'day';
+// This page is the day view (with the court timeline). The activity feed is its own page
+// (activity.html) and is reached from the page menu.
 let selectedDate = new Date();
 let dateInitialized = false;
 // One-shot animation for the next renderCurrentView(): 'enter' after a view switch or first visit,
@@ -909,65 +909,9 @@ function renderCourtsModal() {
 // ── Participant sheet: OrganizationMemberId + membership barcode ──
 // CourtReserve identifies a member in an organization by OrganizationMemberId, which is what the
 // club scans at check-in. The watcher stores it per participant; tapping a roster name opens this
-// sheet, which shows the id and a Code 128 barcode generated from it (no external library, so the
-// page stays self-contained and works offline / from file://).
+// sheet, which shows the id and a Code 128 barcode generated from it. The Code 128 renderer and
+// the standalone check-in page live in barcode.js (no external library, works offline / from file://).
 let personSheet = null; // { key: slot key, name: participant name }
-
-// Code 128 symbol patterns: bar/space widths, always starting with a bar. Index 106 is the stop
-// pattern (7 widths, 13 modules); every other symbol is 11 modules wide.
-const CODE128 = [
-  '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312', '132212', '221213',
-  '221312', '231212', '112232', '122132', '122231', '113222', '123122', '123221', '223211', '221132',
-  '221231', '213212', '223112', '312131', '311222', '321122', '321221', '312212', '322112', '322211',
-  '212123', '212321', '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
-  '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121', '313121', '211331',
-  '231131', '213113', '213311', '213131', '311123', '311321', '331121', '312113', '312311', '332111',
-  '314111', '221411', '431111', '111224', '111422', '121124', '121421', '141122', '141221', '112214',
-  '112412', '122114', '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
-  '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112', '421211', '212141',
-  '214121', '412121', '111143', '111341', '131141', '114113', '114311', '411113', '411311', '113141',
-  '114131', '311141', '411131', '211412', '211214', '211232', '2331112',
-];
-const CODE128_START_B = 104;
-const CODE128_STOP = 106;
-
-// Code 128 code set B covers printable ASCII (space..~), which is all a member id ever needs.
-function code128Modules(value) {
-  const text = String(value ?? '');
-  if (!text || [...text].some((ch) => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) > 126)) return '';
-  const codes = [CODE128_START_B];
-  for (const ch of text) codes.push(ch.charCodeAt(0) - 32);
-  // Checksum: start value + sum(value * position), positions starting at 1, modulo 103.
-  const checksum = codes.reduce((sum, code, i) => sum + code * (i === 0 ? 1 : i), 0) % 103;
-  codes.push(checksum, CODE128_STOP);
-
-  let modules = '';
-  codes.forEach((code, i) => {
-    const pattern = CODE128[code];
-    if (!pattern) return;
-    for (let k = 0; k < pattern.length; k++) {
-      modules += (k % 2 === 0 ? '1' : '0').repeat(Number(pattern[k]));
-    }
-  });
-  return modules;
-}
-
-function barcodeSvg(value) {
-  const modules = code128Modules(value);
-  if (!modules) return '';
-  const quiet = 10; // quiet zone, in modules
-  const width = modules.length + quiet * 2;
-  let bars = '';
-  for (let i = 0; i < modules.length;) {
-    if (modules[i] === '0') { i++; continue; }
-    let end = i;
-    while (end < modules.length && modules[end] === '1') end++;
-    bars += `<rect x="${quiet + i}" y="0" width="${end - i}" height="64"/>`;
-    i = end;
-  }
-  return `<svg class="person-barcode-svg" viewBox="0 0 ${width} 64" preserveAspectRatio="none"`
-    + ` shape-rendering="crispEdges" role="img" aria-label="Barcode ${esc(value)}">${bars}</svg>`;
-}
 
 function openPersonSheet(slotKey, name) {
   personSheet = { key: slotKey, name };
@@ -1021,7 +965,7 @@ function renderPersonSheet() {
         </div>
       </div>
       <div class="person-barcode-wrap">
-        ${barcodeSvg(id)}
+        ${Code128.svg(id)}
         <span class="person-barcode-text">${esc(id)}</span>
       </div>
       <p class="person-hint">Show this barcode at the front desk to check in.</p>`
@@ -1222,17 +1166,6 @@ function initDateIfNeeded(data) {
   }
 }
 
-function setView(view) {
-  currentView = view === 'activity' ? 'activity' : 'day';
-  localStorage.setItem('crw_view', currentView);
-  closeCourtsModal();
-  pendingViewAnim = 'enter';
-  syncUrl();
-  renderCurrentView();
-  // Attach swipe handlers when entering day view
-  if (currentView === 'day') setTimeout(attachSwipeHandlers, 100);
-}
-
 function navToday() {
   selectedDate = new Date();
   pendingViewAnim = 'enter';
@@ -1262,8 +1195,6 @@ function selectDay(dateStr) {
   // Slide in from the side the chosen day sits on, so ribbon taps match swipe navigation.
   pendingViewAnim = nextKey === prevKey ? 'enter' : nextKey < prevKey ? 'prev' : 'next';
   selectedDate = nextDate;
-  currentView = 'day';
-  localStorage.setItem('crw_view', 'day');
   syncUrl();
   renderCurrentView();
 }
@@ -1271,7 +1202,6 @@ function selectDay(dateStr) {
 // ── URL state sync ──
 function syncUrl() {
   const params = new URLSearchParams();
-  params.set('view', currentView);
   params.set('date', toDateStr(selectedDate));
   history.replaceState(null, '', '#' + params.toString());
 }
@@ -1281,25 +1211,26 @@ function restoreFromUrl() {
   if (!hash) return;
   const params = new URLSearchParams(hash);
   const v = params.get('view');
+  // Old tab links: the activity feed is a separate page now.
+  if (v === 'activity') {
+    location.replace(`activity.html${location.search}`);
+    return;
+  }
   const d = params.get('date');
-  const legacyView = !!v && v !== 'day' && v !== 'activity';
-  if (v === 'day' || v === 'activity') currentView = v;
-  else if (v) currentView = 'day'; // links saved with the old week/list views open the day view
   if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
     const [y, m, day] = d.split('-').map(Number);
     selectedDate = new Date(y, m - 1, day);
   }
-  // Rewrite an old week/list link so the address bar matches what is on screen.
-  if (legacyView) syncUrl();
+  // Drop the retired view parameter (day / old week / list links) from the address bar.
+  if (v) syncUrl();
 }
 
 // A device notification opens a hash on an already-running tab (a same-document navigation,
-// so the page does not reload). Follow the new view/date instead of ignoring it.
+// so the page does not reload). Follow the new date instead of ignoring it.
 window.addEventListener('hashchange', () => {
-  const prevView = currentView;
   const prevDate = toDateStr(selectedDate);
   restoreFromUrl();
-  if (currentView === prevView && toDateStr(selectedDate) === prevDate) return;
+  if (toDateStr(selectedDate) === prevDate) return;
   pendingViewAnim = 'enter';
   closeCourtsModal();
   renderCurrentView();
@@ -1309,16 +1240,11 @@ function renderCurrentView() {
   if (!currentData) return;
   const app = document.getElementById('app');
 
-  const titleStr = currentView === 'activity'
-    ? 'All Activity'
-    : selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-
-  const viewHtml = currentView === 'activity'
-    ? renderActivityView(currentData)
-    : renderDayView(currentData);
+  const titleStr = selectedDate.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+  const viewHtml = renderDayView(currentData);
 
   // Keep the day ribbon where the user left it when the same day is re-rendered (e.g. data refresh).
-  const prevRibbon = currentView === 'day' ? document.querySelector('#viewContainer .day-ribbon') : null;
+  const prevRibbon = document.querySelector('#viewContainer .day-ribbon');
   const prevRibbonScroll = prevRibbon ? prevRibbon.scrollLeft : null;
 
   // Consume the one-shot animation so later data refreshes re-render without motion.
@@ -1327,26 +1253,15 @@ function renderCurrentView() {
 
   app.innerHTML = `
     <div class="nav-toolbar">
-      <div class="view-segmented-btn">
-        <button id="seg-day" class="seg-btn ${currentView === 'day' ? 'active' : ''}" onclick="setView('day')">
-          <span class="material-symbols-outlined" style="font-size:18px;">calendar_view_day</span>
-          <span class="seg-label">Day</span>
-        </button>
-        <button id="seg-activity" class="seg-btn ${currentView === 'activity' ? 'active' : ''}" onclick="setView('activity')">
-          <span class="material-symbols-outlined" style="font-size:18px;">history</span>
-          <span class="seg-label">Activity</span>
-        </button>
-      </div>
-
-      <div class="date-nav-controls" id="dateNavControls" style="${currentView === 'activity' ? 'display:none;' : ''}">
-        <button class="nav-btn nav-btn-icon" onclick="navPrev()" title="Previous period" aria-label="Previous period">
+      <div class="date-nav-controls" id="dateNavControls">
+        <button class="nav-btn nav-btn-icon" onclick="navPrev()" title="Previous day" aria-label="Previous day">
           <span class="material-symbols-outlined" style="font-size:20px;">chevron_left</span>
         </button>
         <button class="nav-btn" onclick="navToday()">
           <span class="material-symbols-outlined" style="font-size:16px;">today</span>
           Today
         </button>
-        <button class="nav-btn nav-btn-icon" onclick="navNext()" title="Next period" aria-label="Next period">
+        <button class="nav-btn nav-btn-icon" onclick="navNext()" title="Next day" aria-label="Next day">
           <span class="material-symbols-outlined" style="font-size:20px;">chevron_right</span>
         </button>
         <span class="date-display-title" id="dateDisplayTitle">${titleStr}</span>
@@ -1375,36 +1290,32 @@ function renderCurrentView() {
     namesAnimated = true;
   }
 
-  if (currentView === 'day') {
-    const ribbon = document.querySelector('#viewContainer .day-ribbon');
-    const activeDayBtn = ribbon ? ribbon.querySelector('.day-ribbon-btn.active') : null;
-    if (ribbon && activeDayBtn) {
-      const dateKey = toDateStr(selectedDate);
-      if (prevRibbonScroll !== null && ribbonCenteredFor === dateKey) {
-        ribbon.scrollLeft = prevRibbonScroll;
-      } else {
-        // Only move the strip when the selected day is not already comfortably visible.
-        const pad = 24;
-        const left = activeDayBtn.offsetLeft;
-        const right = left + activeDayBtn.offsetWidth;
-        if (left < ribbon.scrollLeft + pad || right > ribbon.scrollLeft + ribbon.clientWidth - pad) {
-          ribbon.scrollLeft = Math.max(0, left - (ribbon.clientWidth - activeDayBtn.offsetWidth) / 2);
-        }
+  const ribbon = document.querySelector('#viewContainer .day-ribbon');
+  const activeDayBtn = ribbon ? ribbon.querySelector('.day-ribbon-btn.active') : null;
+  if (ribbon && activeDayBtn) {
+    const dateKey = toDateStr(selectedDate);
+    if (prevRibbonScroll !== null && ribbonCenteredFor === dateKey) {
+      ribbon.scrollLeft = prevRibbonScroll;
+    } else {
+      // Only move the strip when the selected day is not already comfortably visible.
+      const pad = 24;
+      const left = activeDayBtn.offsetLeft;
+      const right = left + activeDayBtn.offsetWidth;
+      if (left < ribbon.scrollLeft + pad || right > ribbon.scrollLeft + ribbon.clientWidth - pad) {
+        ribbon.scrollLeft = Math.max(0, left - (ribbon.clientWidth - activeDayBtn.offsetWidth) / 2);
       }
-      ribbonCenteredFor = dateKey;
     }
-    attachSwipeHandlers();
+    ribbonCenteredFor = dateKey;
   }
+  attachSwipeHandlers();
 }
 
-// Cards and sections that rise in with a small stagger when the user changes view or day.
+// Cards and sections that rise in with a small stagger when the user changes day.
 const VIEW_ENTER_TARGETS = [
   '#viewContainer > .day-view-container > *',
-  '#viewContainer > .calendar-week-container .week-day-col',
   '#viewContainer > .section-title',
   '#viewContainer > details.card',
   '#viewContainer > .log-card',
-  '#viewContainer > .activity-view-container',
 ].join(',');
 
 function animateViewContent(container) {
@@ -1638,53 +1549,6 @@ function renderDayView(d) {
   `;
 }
 
-function renderActivityView(d) {
-  const log = (d.log || []).filter((l) => l.type !== 'tracking').slice(0, 200);
-  if (!log.length) {
-    return `<div class="activity-view-container"><div class="box-container" style="text-align:center; padding:48px 16px;">
-      <span class="material-symbols-outlined" style="font-size:48px; color:#bdbdbd; margin-bottom:8px;">history</span>
-      <h3 style="margin:0 0 6px 0; color:var(--md-on-surface);">No activity recorded yet</h3>
-      <p style="color:var(--md-on-surface-variant); font-size:0.875rem; margin:0;">Changes will appear here as the watcher detects them.</p>
-    </div></div>`;
-  }
-
-  // Short verbs keep the compact activity rows on one line (the icon carries the direction).
-  const SHORT = {
-    'waitlist-joined': 'waitlist',
-    'waitlist-left': 'left waitlist',
-    promoted: 'promoted',
-    demoted: 'demoted',
-    removed: 'unlisted',
-  };
-
-  // Group rows by the day the change was detected so dates are easy to scan.
-  let lastDay = '';
-  const rows = log.map((l) => {
-    const tone = cls(l.type) === 'j' ? '#2e7d32' : cls(l.type) === 'l' ? '#c62828' : '#ed6c02';
-    const meta = [l.label, l.ev].filter(Boolean).join(' \u00b7 ');
-    const day = activityDayKey(l.ts);
-    const separator = day !== lastDay ? activityDaySeparator(l.ts) : '';
-    lastDay = day;
-    return `
-    ${separator}
-    <div class="activity-log-row">
-      <span class="act-icon material-symbols-outlined" style="color:${tone}">${ICON[l.type] || 'info'}</span>
-      <span class="act-name">${esc(l.name)}</span>
-      <span class="action-chip ${cls(l.type)}">${esc(SHORT[l.type] || TEXT[l.type] || l.type)}</span>
-      <span class="act-meta" title="${esc(meta)}">${esc(meta)}</span>
-      <span class="act-time">${new Date(l.ts).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
-    </div>
-  `;
-  }).join('');
-
-  return `
-    <div class="section-title"><span class="material-symbols-outlined">history</span> Recent Activity (Last ${log.length} changes)</div>
-    <div class="activity-view-container">
-      <div class="activity-log-card">${rows}</div>
-    </div>
-  `;
-}
-
 function render(d) {
   // Init user name input
   const nameInput = document.getElementById('userNameInput');
@@ -1715,10 +1579,7 @@ function render(d) {
   renderCurrentView();
 
   // Keep an open court timeline in sync with refreshed data (poll reloads every 60s)
-  if (courtsModalDate) {
-    if (currentView === 'day') renderCourtsModal();
-    else closeCourtsModal();
-  }
+  if (courtsModalDate) renderCourtsModal();
 
   // Same for the participant sheet: pick up the newest id/barcode from the refreshed snapshot.
   if (personSheet) renderPersonSheet();
@@ -1756,7 +1617,6 @@ document.addEventListener('click', (event) => {
 }, true);
 
 function navigateDay(direction) {
-  if (currentView !== 'day') return;
   const now = performance.now();
   if (now < dayNavCooldownUntil) return;
   dayNavCooldownUntil = now + DAY_NAV_COOLDOWN;
@@ -1765,8 +1625,8 @@ function navigateDay(direction) {
 
 function attachSwipeHandlers() {
   const container = document.getElementById('viewContainer');
-  if (!container || container.dataset.swipeBound === currentView) return;
-  container.dataset.swipeBound = currentView;
+  if (!container || container.dataset.swipeBound === 'day') return;
+  container.dataset.swipeBound = 'day';
 
   const surface = container.querySelector('.day-view-container');
   if (!surface) return;
@@ -1869,7 +1729,7 @@ function attachSwipeHandlers() {
 
 // Arrow keys do the same on desktop, as long as the user is not typing and no overlay is open.
 document.addEventListener('keydown', (event) => {
-  if (currentView !== 'day' || courtsModalDate || personSheet) return;
+  if (courtsModalDate || personSheet) return;
   if (document.body.classList.contains('nav-open') || document.querySelector('dialog[open]')) return;
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   if (event.target.closest && event.target.closest('input, textarea, select, [contenteditable="true"]')) return;

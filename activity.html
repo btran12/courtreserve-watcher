@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Activity · CourtReserve Watcher</title>
+<!-- Google Fonts & Material Symbols -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1565c0">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <div class="header-title-group">
+    <div class="nav-menu" id="navMenu">
+      <button class="header-btn nav-menu-btn" id="navMenuBtn" type="button"
+              aria-expanded="false" aria-controls="navMenuPanel"
+              title="Open menu" aria-label="Open menu">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+      <nav class="nav-menu-panel" id="navMenuPanel" aria-label="Pages" inert>
+        <div class="nav-drawer-head">
+          <span class="nav-drawer-title">Menu</span>
+          <button class="nav-drawer-close" id="navMenuClose" type="button" aria-label="Close menu">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <a class="nav-menu-item" href="index.html">
+          <span class="material-symbols-outlined nav-menu-icon">calendar_month</span>
+          <span class="nav-menu-text"><b>CourtReserve Watcher</b><small>Court availability</small></span>
+        </a>
+        <a class="nav-menu-item" href="activity.html" aria-current="page">
+          <span class="material-symbols-outlined nav-menu-icon">history</span>
+          <span class="nav-menu-text"><b>Activity</b><small>Recent roster changes</small></span>
+          <span class="material-symbols-outlined nav-menu-check">check</span>
+        </a>
+        <a class="nav-menu-item" href="barcode.html">
+          <span class="material-symbols-outlined nav-menu-icon">barcode</span>
+          <span class="nav-menu-text"><b>Check-in barcode</b><small>Your member barcode</small></span>
+        </a>
+        <a class="nav-menu-item" href="tools/dupr/index.html">
+          <span class="material-symbols-outlined nav-menu-icon">person_search</span>
+          <span class="nav-menu-text"><b>DUPR lookup</b><small>Ratings &amp; match history</small></span>
+        </a>
+      </nav>
+    </div>
+    <img src="icon.png" class="app-icon" alt="CourtReserve Watcher" width="36" height="36">
+    <div class="header-text">
+      <h1>Activity</h1>
+      <span id="activityStatus" class="last-updated">Checking updates...</span>
+    </div>
+  </div>
+  <div class="header-actions">
+    <button class="header-btn icon-btn" id="activityRefresh" type="button" title="Refresh" aria-label="Refresh activity">
+      <span class="material-symbols-outlined">refresh</span>
+    </button>
+  </div>
+</header>
+
+<div class="nav-scrim" id="navScrim"></div>
+
+<main class="activity-page" id="activityPage">
+  <div id="activityContent">
+    <div class="checkin-loading">
+      <span class="material-symbols-outlined">progress_activity</span>
+      Loading activity…
+    </div>
+  </div>
+</main>
+
+<script>
+// Header page menu: toggles the navigation panel and closes it on outside click / Escape.
+(() => {
+  const menu = document.getElementById('navMenu');
+  const btn = document.getElementById('navMenuBtn');
+  const panel = document.getElementById('navMenuPanel');
+  const closeBtn = document.getElementById('navMenuClose');
+  if (!menu || !btn || !panel) return;
+
+  const isOpen = () => document.body.classList.contains('nav-open');
+  const setOpen = (open) => {
+    document.body.classList.toggle('nav-open', open);
+    btn.setAttribute('aria-expanded', String(open));
+    panel.toggleAttribute('inert', !open);
+    if (open && closeBtn) closeBtn.focus({ preventScroll: true });
+  };
+
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
+    setOpen(!isOpen());
+  });
+  if (closeBtn) closeBtn.addEventListener('click', () => { setOpen(false); btn.focus(); });
+  document.addEventListener('click', (event) => {
+    if (isOpen() && !menu.contains(event.target)) setOpen(false);
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && isOpen()) {
+      setOpen(false);
+      btn.focus();
+    }
+  });
+  panel.addEventListener('click', (event) => {
+    if (event.target.closest('a')) setOpen(false);
+  });
+
+  window.matchMedia('(max-width: 600px)').addEventListener('change', (event) => {
+    if (event.matches) setOpen(false);
+  });
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  const controlledOnLoad = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!controlledOnLoad || window.__swReloading) return;
+    window.__swReloading = true;
+    location.reload();
+  });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+      .then((reg) => reg.update())
+      .catch(() => {});
+  });
+}
+</script>
+
+<!-- Mobile bottom navigation -->
+<nav class="bottom-nav" aria-label="Pages">
+  <a class="bottom-nav-item" href="index.html">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">calendar_month</span></span>
+    <span class="bottom-nav-label">Watcher</span>
+  </a>
+  <a class="bottom-nav-item" href="activity.html" aria-current="page">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">history</span></span>
+    <span class="bottom-nav-label">Activity</span>
+  </a>
+  <a class="bottom-nav-item" href="barcode.html">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">barcode</span></span>
+    <span class="bottom-nav-label">Barcode</span>
+  </a>
+  <a class="bottom-nav-item" href="tools/dupr/index.html">
+    <span class="bottom-nav-icon"><span class="material-symbols-outlined">person_search</span></span>
+    <span class="bottom-nav-label">DUPR</span>
+  </a>
+</nav>
+
+<script src="activity.js" defer></script>
+</body>
+</html>
