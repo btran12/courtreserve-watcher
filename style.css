@@ -2496,15 +2496,15 @@
   }
 
   @media (max-width: 600px) {
-    ol.people-list:not(.waitlist-list) { font-size: 1rem; }
+    /* Phones keep the registered roster at the same size/spacing as the waitlist and the
+       event text around it; the roomier touch targets above are for pointer devices only. */
+    ol.people-list:not(.waitlist-list) { font-size: 0.9rem; }
 
     ol.people-list:not(.waitlist-list) .name-btn {
-      padding: 5px 0;
-      min-height: 36px;
-    }
-    ol.people-list:not(.waitlist-list) li.open-slot {
-      padding-top: 5px;
-      padding-bottom: 5px;
+      display: inline;
+      padding: 0;
+      min-height: 0;
+      line-height: inherit;
     }
   }
 
