@@ -719,7 +719,9 @@
       <code>x-dupr-cookie</code> and used just for your requests — leave it empty to fall back to the cookie
       the server is configured with. The API key can also be supplied once in the URL:
       <code>?key=…</code> (or <code>?token=…</code>); it is saved locally and then removed from the
-      address bar.</p>
+      address bar. While a working key is saved, <strong>Share Results</strong> copies a link that
+      includes it (<code>?key=…</code>) so the recipient can use the same endpoint — anyone holding
+      that link holds the key.</p>
     <div class="settings-row">
       <button class="primary" id="settingsSave" type="button">Save</button>
       <button class="ghost" id="settingsClear" type="button">Clear saved</button>
@@ -820,6 +822,8 @@ const store = {
   entries: [],
   picks: {},
   hasCookie: false,
+  // Set once a request carrying the saved API key comes back without a 401.
+  apiKeyOk: false,
 };
 
 const playerState = {
@@ -937,7 +941,16 @@ function clearUrlKeys(...keys) {
 }
 
 // ── share button ─────────────────────────────────────────────────────────────
-// The address bar already describes the search, so "Copy link" just copies it.
+// The address bar already describes the search, so "Copy link" just copies it. If this browser
+// holds an API key the endpoint accepted, the copied link also carries it (?key=…) so the
+// recipient can query the same endpoint without pasting anything. The key only ever goes into
+// the clipboard: this page's own address bar never holds it.
+const canShareKey = () => !!apiToken() && store.apiKeyOk;
+
+const shareTitle = () => (canShareKey()
+  ? 'Copy a link to these results — it includes your API key'
+  : 'Copy a link to these results');
+
 let shareTimer = 0;
 
 function flashShare(message, ok) {
@@ -948,15 +961,26 @@ function flashShare(message, ok) {
   clearTimeout(shareTimer);
   shareTimer = setTimeout(() => {
     el.shareBtn.classList.remove('done');
-    el.shareBtn.title = 'Copy a link to these results';
+    el.shareBtn.title = shareTitle();
     if (label) label.textContent = 'Copy link';
   }, 1800);
+}
+
+// Current search state as a link, plus ?key= when a working API key is saved.
+function shareUrl() {
+  const p = urlParams();
+  const withKey = canShareKey();
+  if (withKey) p.set('key', apiToken());
+  else p.delete('key');
+  const query = p.toString();
+  const base = location.href.replace(/[?#].*$/, '');
+  return { url: base + (query ? '?' + query : ''), withKey };
 }
 
 async function copyShareLink() {
   // Make sure the link matches what is on screen before handing it out.
   syncUrl();
-  const url = location.href;
+  const { url, withKey } = shareUrl();
   let copied = false;
   try {
     if (navigator.clipboard && window.isSecureContext) {
@@ -975,7 +999,7 @@ async function copyShareLink() {
     try { copied = document.execCommand('copy'); } catch { copied = false; }
     box.remove();
   }
-  flashShare(copied ? 'Link copied' : 'Copy failed', copied);
+  flashShare(copied ? (withKey ? 'Link + key copied' : 'Link copied') : 'Copy failed', copied);
 }
 
 // ── transport ────────────────────────────────────────────────────────────────
@@ -1009,6 +1033,11 @@ async function apiFetch(url, opts = {}) {
     const guard = requestGuard(timeout, outer);
     try {
       const res = await fetch(API_BASE + url, { cache: 'no-store', ...rest, headers, signal: guard.signal });
+      // Track whether the saved API key is accepted, so Share can pass it on to the recipient.
+      if (t) {
+        store.apiKeyOk = res.status !== 401;
+        el.shareBtn.title = shareTitle();
+      }
       if (attempt + 1 < attempts && RETRYABLE_STATUS.has(res.status)) {
         try { await res.text(); } catch { /* drain before retrying */ }
         lastError = Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
@@ -1518,6 +1547,8 @@ el.settingsSave.addEventListener('click', () => {
   const token = el.tokenField.value.trim();
   if (cookie) localStorage.setItem('dupr_cookie', cookie); else localStorage.removeItem('dupr_cookie');
   if (token) localStorage.setItem('dupr_token', token); else localStorage.removeItem('dupr_token');
+  // The saved key changed: forget what we knew until checkStatus() confirms it.
+  store.apiKeyOk = false;
   syncSettingsFields();
   el.settingsModal.close();
   el.banner.innerHTML = '';
@@ -1527,6 +1558,7 @@ el.settingsSave.addEventListener('click', () => {
 el.settingsClear.addEventListener('click', () => {
   localStorage.removeItem('dupr_cookie');
   localStorage.removeItem('dupr_token');
+  store.apiKeyOk = false;
   syncSettingsFields();
   el.cookieField.focus();
   el.banner.innerHTML = '';

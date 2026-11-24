@@ -184,6 +184,11 @@ Styled after the DUPR dashboard (navy `#05155E`, accent `#3A79E0`, white cards, 
   (verified: identical totals for `""`, `"CT"`, `"Connecticut"`). Only the first 30 hits per name are
   fetched (`DUPR_MAX_PAGES`), so for very common names widen that if the local match is not in the top 3 pages.
 - **Sort by doubles** re-orders rows.
+- **Share Results** — copies the current search as a link. When this browser holds an API key the
+  endpoint accepts, the copied link also carries it (`?key=…`), so whoever opens it can run the same
+  lookups without pasting anything — anyone holding that link holds the key. Without a working key the
+  link only describes the search. The sharer's address bar never keeps the key; the recipient's page
+  saves it to `localStorage` and strips it from the address bar just like any other `?key=` link.
 
 ## Notes
 
