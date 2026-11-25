@@ -50,6 +50,15 @@ let namesAnimated = false;
 // Date the day ribbon was last scrolled for, so a data refresh keeps the user's scroll position.
 let ribbonCenteredFor = null;
 
+// Normalize a person's name for matching: lowercase, strip non‑alpha chars, collapse whitespace.
+function nameKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')   // keep only letters a-z and whitespace; remove digits & special chars
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // Restore view/date from URL if present (overrides localStorage / defaults)
 restoreFromUrl();
 
@@ -585,16 +594,16 @@ function setUserName(name) {
 }
 function userStatus(snapshot) {
   if (!userName || !snapshot) return null;
-  const key = userName.toLowerCase().trim();
+  const key = nameKey(userName);
   for (const [name, p] of Object.entries(snapshot.people)) {
-    if (name.toLowerCase().trim() === key) return p.status;
+    if (nameKey(name) === key) return p.status;
   }
   return null;
 }
 // Every roster name is a button: tapping it opens the participant sheet with the
 // CourtReserve OrganizationMemberId and a Code 128 barcode generated from it.
 function personButton(name, snapshot, waitlist = false) {
-  const matched = !!userName && name.toLowerCase().trim() === userName.toLowerCase().trim();
+  const matched = !!userName && nameKey(name) === nameKey(userName);
   const inner = matched
     ? `<span class="${waitlist ? 'user-match-waitlist' : 'user-match'}">${esc(name)}</span>`
     : esc(name);
