@@ -91,7 +91,11 @@
     editing: false,
   };
 
-  const nameKey = (value) => String(value || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  const nameKey = (value) => String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, '')   // keep only letters a-z and whitespace; remove digits & special chars
+    .replace(/\s+/g, ' ')
+    .trim();
   const initials = (name) => (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('');
 
   function readCachedId() {
