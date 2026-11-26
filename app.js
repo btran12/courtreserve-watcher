@@ -49,6 +49,8 @@ let pendingViewAnim = 'enter';
 let namesAnimated = false;
 // Date the day ribbon was last scrolled for, so a data refresh keeps the user's scroll position.
 let ribbonCenteredFor = null;
+let loadAttempts = 0;
+const MAX_LOAD_ATTEMPTS = 3;
 
 // Normalize a person's name for matching: lowercase, strip non‑alpha chars, collapse whitespace.
 function nameKey(value) {
@@ -1770,12 +1772,22 @@ async function load() {
     return; 
   }
   
+  loadAttempts += 1;
+  if (loadAttempts > MAX_LOAD_ATTEMPTS) {
+    // Give up after max attempts — show error so the user can press Refresh to try again.
+    app.innerHTML = '<div class="err">Failed to load data after several attempts. Press refresh to try again.</div>';
+    return;
+  }
+  
   try {
     const r = await fetch(`${src}${src.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     render(await r.json());
-  } catch (e) { 
-    app.innerHTML = `<div class="err">Failed to load data: ${esc(e.message)} (check bucket CORS / URL)</div>`; 
+  } catch (e) {
+    // On failure, stay in the retry loop; the next setInterval / visibilitychange call will attempt again.
+    if (loadAttempts <= MAX_LOAD_ATTEMPTS) {
+      /* keep going — no UI change; renderCurrentView() will show current data or the "Loading events data..." skeleton */
+    }
   } finally {
   }
 }

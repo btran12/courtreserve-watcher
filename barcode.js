@@ -327,17 +327,29 @@
       : '';
   }
 
+  const MAX_LOAD_ATTEMPTS = 3;
+  let loadAttempts = 0;
+
   async function load() {
     if (!src) return;
+    loadAttempts += 1;
+    if (loadAttempts > MAX_LOAD_ATTEMPTS) {
+      // Give up after max attempts — show error so the user can press Refresh.
+      state.error = 'Failed to load data after several attempts. Press refresh to try again.';
+      state.loading = false;
+      el.refresh?.classList.remove('spinning');
+      render();
+      return;
+    }
     el.refresh?.classList.add('spinning');
     state.loading = true;
+    state.error = '';
     try {
       const r = await fetch(`${src}${src.includes('?') ? '&' : '?'}t=${Date.now()}`, { cache: 'no-store' });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       state.data = await r.json();
-      state.error = '';
-      if (el.banner && !el.banner.classList.contains('err')) el.banner.hidden = true;
-      updateStatus();
+      // Success — reset attempt counter so a later manual refresh starts fresh.
+      loadAttempts = 0;
     } catch (e) {
       state.error = (e && e.message) || 'request failed';
     } finally {
